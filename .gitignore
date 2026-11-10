@@ -49,3 +49,7 @@ vitest.config.*.timestamp*
 .vitest
 .neon
 .env.local
+
+# Next.js
+.next
+out
