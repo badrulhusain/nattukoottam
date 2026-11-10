@@ -1,0 +1,424 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// ENUMS
+// ----------------------------------------------------
+
+enum Role {
+  CITIZEN
+  COMMUNITY_MODERATOR
+  DEPARTMENT_OFFICIAL
+  ADMIN
+}
+
+enum DepartmentType {
+  PANCHAYAT_LSGD
+  KERALA_WATER_AUTHORITY
+  KSEB
+  PWD
+  IRRIGATION_DRAINAGE
+  WASTE_MANAGEMENT
+  OTHER
+}
+
+enum IssueCategory {
+  ROAD_TRANSPORT
+  WATER_SUPPLY
+  ELECTRICITY
+  DRAINAGE
+  WASTE_MANAGEMENT
+  PUBLIC_SAFETY
+  HEALTH_SANITATION
+  OTHER
+}
+
+enum IssueStatus {
+  REPORTED
+  UNDER_REVIEW
+  VERIFIED
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_COORDINATION
+  RESOLVED
+  REOPENED
+  REJECTED
+}
+
+enum UrgencyLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ProjectStatus {
+  PLANNED
+  APPROVED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ConflictStatus {
+  POTENTIAL
+  CONFIRMED
+  RESOLVED
+  DISMISSED
+}
+
+enum NotificationType {
+  ISSUE_STATUS_UPDATED
+  ISSUE_SUPPORTED
+  POST_COMMENTED
+  POST_LIKED
+  OFFICIAL_ASSIGNED
+  PROJECT_CONFLICT_ALERT
+  COORDINATION_REQUEST
+}
+
+// ----------------------------------------------------
+// USER & AUTHENTICATION
+// ----------------------------------------------------
+
+model User {
+  id               String       @id @default(uuid())
+  email            String?      @unique
+  phone            String       @unique
+  passwordHash     String
+  fullName         String
+  avatarUrl        String?
+  role             Role         @default(CITIZEN)
+  district         String       // e.g. Ernakulam, Thiruvananthapuram
+  locality         String       // e.g. Kakkanad, Aluva
+  wardNumber       Int?
+  preferredLang    String       @default("ml") // 'ml' | 'en'
+  isActive         Boolean      @default(true)
+  isVerified       Boolean      @default(false)
+  refreshTokenHash String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  officialProfile  DepartmentOfficial?
+
+  posts            Post[]
+  postLikes        PostLike[]
+  postComments     PostComment[]
+  reportedIssues   Issue[]          @relation("ReportedIssues")
+  issueSupports    IssueSupport[]
+  issueFollows     IssueFollow[]
+  issueEvidences   IssueEvidence[]
+  issueHistories   IssueHistory[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+
+  following        Follow[]     @relation("Follower")
+  followers        Follow[]     @relation("Following")
+
+  @@index([phone])
+  @@index([district, locality])
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+// ----------------------------------------------------
+// SOCIAL POSTS & FEED
+// ----------------------------------------------------
+
+model Post {
+  id           String        @id @default(uuid())
+  authorId     String
+  content      String        // UTF-8 supported (Malayalam/English)
+  category     IssueCategory?
+  district     String
+  locality     String
+  latitude     Float?
+  longitude    Float?
+  language     String        @default("ml")
+  viewCount    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  author       User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  media        PostMedia[]
+  likes        PostLike[]
+  comments     PostComment[]
+
+  @@index([district, locality])
+  @@index([createdAt(sort: Desc)])
+}
+
+model PostMedia {
+  id        String   @id @default(uuid())
+  postId    String
+  mediaUrl  String
+  mediaType String   // 'IMAGE' | 'VIDEO'
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model PostLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model PostComment {
+  id        String        @id @default(uuid())
+  postId    String
+  authorId  String
+  parentId  String?       // Nested reply
+  content   String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   PostComment[] @relation("CommentReplies")
+}
+
+// ----------------------------------------------------
+// INFRASTRUCTURE ISSUES
+// ----------------------------------------------------
+
+model Issue {
+  id                  String         @id @default(uuid())
+  title               String
+  description         String
+  category            IssueCategory
+  urgency             UrgencyLevel   @default(MEDIUM)
+  status              IssueStatus    @default(REPORTED)
+  district            String
+  locality            String
+  wardNumber          Int?
+  address             String?
+  latitude            Float
+  longitude           Float
+  reporterId          String
+  assignedDeptId      String?
+  assignedOfficialId  String?
+  resolutionNotes     String?
+  resolvedAt          DateTime?
+  aiPriorityScore     Float?         // 0.0 - 100.0 computed by intelligence module
+  rootCauseClusterId  String?        // ID linking correlated incidents
+  mergedIntoIssueId   String?        // Target issue ID if duplicate
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  reporter            User           @relation("ReportedIssues", fields: [reporterId], references: [id])
+  department          Department?    @relation(fields: [assignedDeptId], references: [id])
+  assignedOfficial    DepartmentOfficial? @relation(fields: [assignedOfficialId], references: [id])
+  parentIssue         Issue?         @relation("MergedDuplicates", fields: [mergedIntoIssueId], references: [id])
+  duplicateIssues     Issue[]        @relation("MergedDuplicates")
+
+  supports            IssueSupport[]
+  followers           IssueFollow[]
+  evidences           IssueEvidence[]
+  history             IssueHistory[]
+
+  @@index([district, locality])
+  @@index([latitude, longitude])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt(sort: Desc)])
+}
+
+model IssueSupport {
+  id        String   @id @default(uuid())
+  issueId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([issueId, userId])
+}
+
+model IssueFollow {
+  id        String   @id @default(uuid())
+  issueId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([issueId, userId])
+}
+
+model IssueEvidence {
+  id           String   @id @default(uuid())
+  issueId      String
+  uploadedById String
+  fileUrl      String
+  mediaType    String   // 'IMAGE' | 'VIDEO' | 'DOCUMENT'
+  caption      String?
+  isOfficial   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  issue        Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+}
+
+model IssueHistory {
+  id         String       @id @default(uuid())
+  issueId    String
+  actorId    String
+  fromStatus IssueStatus?
+  toStatus   IssueStatus
+  notes      String?
+  createdAt  DateTime     @default(now())
+
+  issue      Issue        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  actor      User         @relation(fields: [actorId], references: [id])
+}
+
+// ----------------------------------------------------
+// DEPARTMENTS & OFFICIALS
+// ----------------------------------------------------
+
+model Department {
+  id           String         @id @default(uuid())
+  name         String
+  code         String         @unique
+  type         DepartmentType
+  district     String
+  contactEmail String?
+  contactPhone String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  officials    DepartmentOfficial[]
+  issues       Issue[]
+  projects     InfrastructureProject[]
+}
+
+model DepartmentOfficial {
+  id             String      @id @default(uuid())
+  userId         String      @unique
+  departmentId   String
+  designation    String
+  jurisdiction   String
+  badgeNumber    String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department     Department  @relation(fields: [departmentId], references: [id])
+  assignedIssues Issue[]
+}
+
+// ----------------------------------------------------
+// INFRASTRUCTURE PROJECTS & OVERLAP COORDINATION
+// ----------------------------------------------------
+
+model InfrastructureProject {
+  id              String        @id @default(uuid())
+  name            String
+  description     String
+  departmentId    String
+  category        IssueCategory
+  status          ProjectStatus @default(PLANNED)
+  district        String
+  locality        String
+  roadName        String?
+  latitude        Float
+  longitude       Float
+  radiusMeters    Float         @default(200.0)
+  estimatedCost   Float?
+  startDate       DateTime
+  expectedEndDate DateTime
+  actualEndDate   DateTime?
+  contractorName  String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  department      Department    @relation(fields: [departmentId], references: [id])
+  conflictsA      ProjectConflict[] @relation("ProjectA")
+  conflictsB      ProjectConflict[] @relation("ProjectB")
+
+  @@index([district, locality])
+  @@index([latitude, longitude])
+  @@index([status])
+}
+
+model ProjectConflict {
+  id             String         @id @default(uuid())
+  projectAId     String
+  projectBId     String
+  distanceMeters  Float
+  dateOverlapDays Int
+  status         ConflictStatus @default(POTENTIAL)
+  notes          String?
+  jointPlan      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  projectA       InfrastructureProject @relation("ProjectA", fields: [projectAId], references: [id], onDelete: Cascade)
+  projectB       InfrastructureProject @relation("ProjectB", fields: [projectBId], references: [id], onDelete: Cascade)
+
+  @@unique([projectAId, projectBId])
+}
+
+// ----------------------------------------------------
+// NOTIFICATIONS & AUDIT
+// ----------------------------------------------------
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  metadata  Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt(sort: Desc)])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  action    String
+  resource  String
+  payload   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+}
+
