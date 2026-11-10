@@ -1,12 +1,15 @@
 import { create } from 'zustand';
 import { Language, Post, User } from '../types';
 import { CURRENT_USER_MOCK, INITIAL_POSTS_MOCK, KERALA_LOCALITIES } from './constants';
+import { DetectedLocation } from './geolocation';
 
 interface AppState {
   language: Language;
   setLanguage: (lang: Language) => void;
   currentLocality: string;
   setLocality: (locality: string) => void;
+  userLocation: DetectedLocation | null;
+  setUserLocation: (loc: DetectedLocation | null) => void;
   currentUser: User;
   activeTab: 'home' | 'grievances' | 'discover' | 'notifications' | 'profile' | 'official';
   setActiveTab: (tab: 'home' | 'grievances' | 'discover' | 'notifications' | 'profile' | 'official') => void;
@@ -29,6 +32,19 @@ export const useAppStore = create<AppState>((set) => ({
   setLanguage: (language) => set({ language }),
   currentLocality: 'Kakkanad',
   setLocality: (currentLocality) => set({ currentLocality }),
+  userLocation: null,
+  setUserLocation: (userLocation) =>
+    set((state) => ({
+      userLocation,
+      currentLocality: userLocation ? userLocation.locality : state.currentLocality,
+      currentUser: userLocation
+        ? {
+            ...state.currentUser,
+            locality: userLocation.locality,
+            district: userLocation.district,
+          }
+        : state.currentUser,
+    })),
   currentUser: CURRENT_USER_MOCK,
   activeTab: 'home',
   setActiveTab: (activeTab) => set({ activeTab }),

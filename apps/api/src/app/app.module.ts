@@ -5,6 +5,11 @@ import { NeonRealtimeModule } from '../modules/neon-realtime/neon-realtime.modul
 import { StorageModule } from '../modules/storage/storage.module';
 import { ClerkAuthModule } from '../modules/clerk-auth/clerk-auth.module';
 import { HealthModule } from '../modules/health/health.module';
+import { AuthModule } from '../modules/auth/auth.module';
+import { PostsModule } from '../modules/posts/posts.module';
+import { IssuesModule } from '../modules/issues/issues.module';
+import { ProjectsModule } from '../modules/projects/projects.module';
+import { DepartmentsModule } from '../modules/departments/departments.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -19,6 +24,11 @@ import { AppService } from './app.service';
     StorageModule,
     ClerkAuthModule,
     HealthModule,
+    AuthModule,
+    PostsModule,
+    IssuesModule,
+    ProjectsModule,
+    DepartmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

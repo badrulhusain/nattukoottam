@@ -56,6 +56,10 @@ export interface Post {
   urgency?: UrgencyLevel;
   locality: string;
   district: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
   mediaUrls: string[];
   likesCount: number;
   isLiked?: boolean;

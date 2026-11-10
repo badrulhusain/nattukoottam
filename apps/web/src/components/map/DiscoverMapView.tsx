@@ -6,7 +6,7 @@ import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 
 export const DiscoverMapView: React.FC = () => {
-  const { language, posts } = useAppStore();
+  const { language, posts, userLocation } = useAppStore();
   const t = getT(language);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(posts[0]?.id || null);
 
@@ -16,6 +16,20 @@ export const DiscoverMapView: React.FC = () => {
     { id: 'post_01', title: 'Infopark Road Potholes', locality: 'Kakkanad', lat: 10.0159, lng: 76.3419, urgency: 'HIGH', category: 'ROAD_TRANSPORT' },
     { id: 'post_02', title: 'Pipeline Leakage', locality: 'Perinthalmanna', lat: 10.9760, lng: 76.2254, urgency: 'CRITICAL', category: 'WATER_SUPPLY' },
     { id: 'post_03', title: 'Tilted Electric Post', locality: 'Aluva', lat: 10.1076, lng: 76.3516, urgency: 'HIGH', category: 'ELECTRICITY' },
+    ...(userLocation
+      ? [
+          {
+            id: 'user_live_loc',
+            title: 'Your Location',
+            locality: userLocation.locality,
+            lat: userLocation.latitude,
+            lng: userLocation.longitude,
+            urgency: 'LOW',
+            category: 'OTHER',
+            isUserLoc: true,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -50,14 +64,20 @@ export const DiscoverMapView: React.FC = () => {
               >
                 <div
                   className={`px-2 py-0.5 rounded-md text-[10px] font-bold shadow-xs whitespace-nowrap mb-1 transition-colors ${
-                    isSelected ? 'bg-[#087A45] text-white' : 'bg-white text-[#17251D] border border-[#E6EEE8]'
+                    (pin as any).isUserLoc
+                      ? 'bg-blue-600 text-white'
+                      : isSelected
+                      ? 'bg-[#087A45] text-white'
+                      : 'bg-white text-[#17251D] border border-[#E6EEE8]'
                   }`}
                 >
-                  {pin.locality}
+                  {(pin as any).isUserLoc ? `📍 You (${pin.locality})` : pin.locality}
                 </div>
                 <div
                   className={`w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all ${
-                    isSelected
+                    (pin as any).isUserLoc
+                      ? 'bg-blue-600 text-white ring-4 ring-blue-300 animate-pulse'
+                      : isSelected
                       ? 'bg-[#087A45] text-white ring-4 ring-[#32C878]/30'
                       : 'bg-white text-[#087A45] border border-[#087A45]'
                   }`}

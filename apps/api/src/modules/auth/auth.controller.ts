@@ -60,3 +60,4 @@ export class AuthController {
     return this.authService.syncClerkUser(body);
   }
 }
+

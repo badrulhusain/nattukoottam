@@ -1,26 +1,140 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Camera, MapPin, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  Camera,
+  MapPin,
+  Sparkles,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  Navigation,
+  Compass,
+  Edit2,
+  ChevronDown,
+} from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 import { IssueCategory, UrgencyLevel } from '../../types';
+import {
+  getCurrentGpsPosition,
+  reverseGeocodeCoordinates,
+  EXTENDED_KERALA_LOCALITIES,
+  KERALA_DISTRICTS,
+  findClosestKeralaLocality,
+} from '../../lib/geolocation';
 
-export const CreatePostModal: React.FC = () => {
-  const { isCreateModalOpen, setIsCreateModalOpen, language, currentLocality, addPost, currentUser } = useAppStore();
+interface CreatePostModalProps {
+  autoDetectGps?: boolean;
+}
+
+export const CreatePostModal: React.FC<CreatePostModalProps> = ({ autoDetectGps = false }) => {
+  const {
+    isCreateModalOpen,
+    setIsCreateModalOpen,
+    language,
+    currentLocality,
+    setLocality,
+    userLocation,
+    setUserLocation,
+    addPost,
+    currentUser,
+  } = useAppStore();
   const t = getT(language);
 
   const [content, setContent] = useState('');
   const [category, setCategory] = useState<IssueCategory>('ROAD_TRANSPORT');
   const [urgency, setUrgency] = useState<UrgencyLevel>('HIGH');
   const [mediaUrl, setMediaUrl] = useState('');
-  const [gpsDetected, setGpsDetected] = useState(false);
+
+  // Location & GPS State
+  const [selectedLocality, setSelectedLocality] = useState(currentLocality || 'Kakkanad');
+  const [selectedDistrict, setSelectedDistrict] = useState(currentUser.district || 'Ernakulam');
+  const [streetAddress, setStreetAddress] = useState('');
+  const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>(
+    userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude, accuracy: userLocation.accuracy } : null
+  );
+
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'detecting' | 'success' | 'error'>(
+    userLocation ? 'success' : 'idle'
+  );
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [isManualEditOpen, setIsManualEditOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync with userLocation if already detected
+  useEffect(() => {
+    if (userLocation) {
+      setSelectedLocality(userLocation.locality);
+      setSelectedDistrict(userLocation.district);
+      if (userLocation.formattedAddress) {
+        setStreetAddress(userLocation.formattedAddress);
+      }
+      setCoords({
+        lat: userLocation.latitude,
+        lng: userLocation.longitude,
+        accuracy: userLocation.accuracy,
+      });
+      setGpsStatus('success');
+    }
+  }, [userLocation]);
 
   if (!isCreateModalOpen) return null;
 
-  const handleDetectGps = () => {
-    setGpsDetected(true);
+  const handleDetectGps = async () => {
+    setGpsStatus('detecting');
+    setGpsError(null);
+
+    try {
+      const position = await getCurrentGpsPosition();
+      const { latitude, longitude, accuracy } = position.coords;
+
+      // Reverse geocode via OpenStreetMap Nominatim
+      const detected = await reverseGeocodeCoordinates(latitude, longitude, accuracy);
+
+      setSelectedLocality(detected.locality);
+      setSelectedDistrict(detected.district);
+      setStreetAddress(detected.formattedAddress);
+      setCoords({
+        lat: detected.latitude,
+        lng: detected.longitude,
+        accuracy: detected.accuracy,
+      });
+
+      // Update global app state so entire app knows user's real location
+      setUserLocation(detected);
+      setLocality(detected.locality);
+      setGpsStatus('success');
+    } catch (err: any) {
+      console.warn('GPS detection failed:', err);
+      setGpsStatus('error');
+      let msg = t.create.gpsError;
+      if (err?.code === 1) {
+        msg = language === 'ml' 
+          ? 'ലൊക്കേഷൻ അനുമതി നൽകിയിട്ടില്ല. താഴെ നിങ്ങളുടെ സ്ഥലം നേരിട്ട് തിരഞ്ഞെടുക്കുക.'
+          : 'Location permission was denied. Please select your locality manually below.';
+      } else if (err?.code === 3) {
+        msg = language === 'ml'
+          ? 'ലൊക്കേഷൻ സമയം കഴിഞ്ഞുപോയി. വീണ്ടും ശ്രമിക്കുകയോ നേരിട്ട് നൽകുകയോ ചെയ്യുക.'
+          : 'Location acquisition timed out. Please retry or choose your locality below.';
+      }
+      setGpsError(msg);
+      setIsManualEditOpen(true);
+    }
+  };
+
+  const handleLocalitySelect = (localityName: string) => {
+    const loc = EXTENDED_KERALA_LOCALITIES.find((l) => l.name === localityName);
+    if (loc) {
+      setSelectedLocality(loc.name);
+      setSelectedDistrict(loc.district);
+      setCoords({ lat: loc.lat, lng: loc.lng, accuracy: 50 });
+      setStreetAddress(`${loc.name}, ${loc.district}, Kerala`);
+      setLocality(loc.name);
+    } else {
+      setSelectedLocality(localityName);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -28,6 +142,16 @@ export const CreatePostModal: React.FC = () => {
     if (!content.trim()) return;
 
     setIsSubmitting(true);
+
+    // If coordinates were not acquired by GPS, pick representative coordinates for selected locality
+    let finalCoords = coords;
+    if (!finalCoords) {
+      const found = EXTENDED_KERALA_LOCALITIES.find(
+        (l) => l.name.toLowerCase() === selectedLocality.toLowerCase()
+      ) || EXTENDED_KERALA_LOCALITIES[0];
+      finalCoords = { lat: found.lat, lng: found.lng, accuracy: 100 };
+    }
+
     setTimeout(() => {
       addPost({
         author: {
@@ -35,13 +159,17 @@ export const CreatePostModal: React.FC = () => {
           fullName: currentUser.fullName,
           username: currentUser.username,
           avatarUrl: currentUser.avatarUrl,
-          locality: currentLocality,
+          locality: selectedLocality,
         },
         content,
         category,
         urgency,
-        locality: currentLocality,
-        district: currentUser.district,
+        locality: selectedLocality,
+        district: selectedDistrict,
+        address: streetAddress || `${selectedLocality}, ${selectedDistrict}`,
+        latitude: finalCoords.lat,
+        longitude: finalCoords.lng,
+        accuracy: finalCoords.accuracy,
         mediaUrls: mediaUrl
           ? [mediaUrl]
           : [
@@ -52,9 +180,8 @@ export const CreatePostModal: React.FC = () => {
 
       setContent('');
       setMediaUrl('');
-      setGpsDetected(false);
       setIsSubmitting(false);
-    }, 400);
+    }, 350);
   };
 
   const samplePhotoPresets = [
@@ -65,7 +192,7 @@ export const CreatePostModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden p-5 sm:p-6 shadow-2xl border border-[#E6EEE8] space-y-4 max-h-[90vh] overflow-y-auto no-scrollbar">
+      <div className="w-full max-w-lg bg-white rounded-t-[32px] sm:rounded-[32px] overflow-hidden p-5 sm:p-6 shadow-2xl border border-[#E6EEE8] space-y-4 max-h-[92vh] overflow-y-auto no-scrollbar">
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-[#E6EEE8]">
           <div className="flex items-center gap-2">
@@ -82,7 +209,7 @@ export const CreatePostModal: React.FC = () => {
           </button>
         </div>
 
-        {/* AI Insight Badge */}
+        {/* AI Notice Badge */}
         <div className="p-3 bg-[#E9F8ED]/60 border border-[#32C878]/30 rounded-2xl flex items-start gap-2 text-xs text-[#064B2E]">
           <Sparkles className="w-4 h-4 text-[#087A45] mt-0.5 flex-shrink-0" />
           <span>{t.create.aiNotice}</span>
@@ -94,7 +221,7 @@ export const CreatePostModal: React.FC = () => {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder={t.create.inputPlaceholder}
-            rows={4}
+            rows={3}
             required
             className="w-full p-3.5 rounded-2xl bg-[#F7FAF7] border border-[#E6EEE8] text-sm text-[#17251D] placeholder-[#77847C] outline-none focus:border-[#087A45] focus:bg-white transition-all resize-none"
           />
@@ -139,35 +266,165 @@ export const CreatePostModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Location & GPS */}
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-[#F7FAF7] border border-[#E6EEE8]">
-            <div className="flex items-center gap-2 text-xs text-[#17251D]">
-              <MapPin className="w-4 h-4 text-[#087A45]" />
-              <span className="font-semibold">{currentLocality}, Kerala</span>
+          {/* REAL GPS & LOCATION SECTION */}
+          <div className="space-y-2 rounded-2xl bg-[#F7FAF7] border border-[#E6EEE8] p-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#17251D]">
+                <MapPin className="w-4 h-4 text-[#087A45]" />
+                <span>{language === 'ml' ? 'പ്രശ്നത്തിന്റെ സ്ഥലം (GPS)' : 'Issue Location (GPS & Address)'}</span>
+              </div>
+
+              {/* GPS Action Button */}
+              <button
+                type="button"
+                onClick={handleDetectGps}
+                disabled={gpsStatus === 'detecting'}
+                className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all flex items-center gap-1.5 shadow-2xs ${
+                  gpsStatus === 'detecting'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : gpsStatus === 'success'
+                    ? 'bg-[#E9F8ED] border border-[#087A45]/40 text-[#087A45]'
+                    : 'bg-[#087A45] text-white hover:bg-[#064B2E]'
+                }`}
+              >
+                {gpsStatus === 'detecting' ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{t.create.detectingGps}</span>
+                  </>
+                ) : gpsStatus === 'success' ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#087A45]" />
+                    <span>{t.create.gpsDetected}</span>
+                  </>
+                ) : (
+                  <>
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>{t.create.useGps}</span>
+                  </>
+                )}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleDetectGps}
-              className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1 ${
-                gpsDetected ? 'bg-emerald-100 text-emerald-800' : 'bg-white border border-[#E6EEE8] text-[#087A45]'
-              }`}
-            >
-              {gpsDetected ? (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{t.create.gpsDetected}</span>
-                </>
-              ) : (
-                <span>{t.create.useGps}</span>
+
+            {/* Location Status Card */}
+            <div className="p-3 bg-white rounded-xl border border-[#E6EEE8] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-[#17251D]">
+                    {selectedLocality}, {selectedDistrict}
+                  </span>
+                  {coords && (
+                    <div className="text-[11px] font-mono text-[#087A45] flex items-center gap-1.5 mt-0.5">
+                      <Compass className="w-3 h-3 text-[#087A45]" />
+                      <span>{coords.lat.toFixed(5)}° N, {coords.lng.toFixed(5)}° E</span>
+                      {coords.accuracy && (
+                        <span className="text-[10px] text-[#77847C] bg-[#F7FAF7] px-1.5 py-0.5 rounded-md border border-[#E6EEE8]">
+                          ±{coords.accuracy}m
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsManualEditOpen(!isManualEditOpen)}
+                  className="text-xs text-[#087A45] hover:underline flex items-center gap-1 font-medium"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  <span>{isManualEditOpen ? 'Done' : t.create.editLocation}</span>
+                </button>
+              </div>
+
+              {/* Formatted address display */}
+              {streetAddress && (
+                <p className="text-[11px] text-[#77847C] line-clamp-2">
+                  {streetAddress}
+                </p>
               )}
-            </button>
+            </div>
+
+            {/* Error banner if GPS failed */}
+            {gpsError && (
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <span>{gpsError}</span>
+              </div>
+            )}
+
+            {/* Manual Location Fine-Tuning Drawer */}
+            {isManualEditOpen && (
+              <div className="p-3 bg-white rounded-xl border border-[#32C878]/40 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="text-[11px] font-semibold text-[#064B2E]">
+                  {language === 'ml' ? 'പ്രദേശം തിരഞ്ഞെടുക്കുക അല്ലെങ്കിൽ മാറ്റുക:' : 'Fine-tune location details:'}
+                </div>
+
+                {/* Quick Kerala Locality Dropdown */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-[#77847C] font-semibold block mb-0.5">District</label>
+                    <select
+                      value={selectedDistrict}
+                      onChange={(e) => {
+                        const dist = e.target.value;
+                        setSelectedDistrict(dist);
+                        const firstLocInDist = EXTENDED_KERALA_LOCALITIES.find((l) => l.district === dist);
+                        if (firstLocInDist) {
+                          handleLocalitySelect(firstLocInDist.name);
+                        }
+                      }}
+                      className="w-full p-2 bg-[#F7FAF7] border border-[#E6EEE8] rounded-xl text-xs text-[#17251D] outline-none"
+                    >
+                      {KERALA_DISTRICTS.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-[#77847C] font-semibold block mb-0.5">Town / Locality</label>
+                    <select
+                      value={selectedLocality}
+                      onChange={(e) => handleLocalitySelect(e.target.value)}
+                      className="w-full p-2 bg-[#F7FAF7] border border-[#E6EEE8] rounded-xl text-xs text-[#17251D] outline-none"
+                    >
+                      {EXTENDED_KERALA_LOCALITIES.filter((l) => l.district === selectedDistrict).map((l) => (
+                        <option key={l.name} value={l.name}>
+                          {l.name} ({l.pincode})
+                        </option>
+                      ))}
+                      {/* Allow custom locality if not in list */}
+                      {!EXTENDED_KERALA_LOCALITIES.some((l) => l.name === selectedLocality) && (
+                        <option value={selectedLocality}>{selectedLocality}</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Specific street / landmark input */}
+                <div>
+                  <label className="text-[10px] text-[#77847C] font-semibold block mb-0.5">
+                    {language === 'ml' ? 'ലാൻഡ്മാർക്ക് / റോഡിന്റെ പേര്:' : 'Landmark / Street / Junction:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={streetAddress}
+                    onChange={(e) => setStreetAddress(e.target.value)}
+                    placeholder={t.create.landmarkPlaceholder}
+                    className="w-full p-2 bg-[#F7FAF7] border border-[#E6EEE8] rounded-xl text-xs text-[#17251D] placeholder-[#77847C] outline-none focus:border-[#087A45]"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Quick Photo Presets */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1 text-xs font-semibold text-[#77847C]">
               <Camera className="w-3.5 h-3.5 text-[#087A45]" />
-              <span>{t.create.addPhotos} (Attach Photo)</span>
+              <span>{t.create.addPhotos}</span>
             </div>
             <div className="flex items-center gap-2">
               {samplePhotoPresets.map((preset) => (
@@ -202,4 +459,3 @@ export const CreatePostModal: React.FC = () => {
     </div>
   );
 };
-

@@ -1,15 +1,58 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MapPin, Search, Bell, Menu, Globe } from 'lucide-react';
+import { MapPin, Search, Bell, Menu, Globe, Navigation, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
-import { KERALA_LOCALITIES } from '../../lib/constants';
+import { EXTENDED_KERALA_LOCALITIES } from '../../lib/geolocation';
+import { getCurrentGpsPosition, reverseGeocodeCoordinates } from '../../lib/geolocation';
 
 export const AppHeader: React.FC = () => {
-  const { language, setLanguage, currentLocality, setLocality, setIsOnboardingOpen, setActiveTab } = useAppStore();
+  const {
+    language,
+    setLanguage,
+    currentLocality,
+    setLocality,
+    setUserLocation,
+    setIsOnboardingOpen,
+    setActiveTab,
+  } = useAppStore();
   const t = getT(language);
+
   const [isLocalityDropdownOpen, setIsLocalityDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDetectingGps, setIsDetectingGps] = useState(false);
+
+  const handleHeaderGpsDetect = async () => {
+    setIsDetectingGps(true);
+    try {
+      const pos = await getCurrentGpsPosition();
+      const detected = await reverseGeocodeCoordinates(
+        pos.coords.latitude,
+        pos.coords.longitude,
+        pos.coords.accuracy
+      );
+      setUserLocation(detected);
+      setLocality(detected.locality);
+      setIsLocalityDropdownOpen(false);
+    } catch (err) {
+      console.warn('GPS detection failed from header:', err);
+      alert(
+        language === 'ml'
+          ? 'GPS ലഭ്യമായില്ല. അനുമതി നൽകുകയോ താഴെയുള്ള പട്ടികയിൽ നിന്ന് തിരഞ്ഞെടുക്കുകയോ ചെയ്യുക.'
+          : 'Could not acquire GPS. Please ensure location permissions are enabled.'
+      );
+    } finally {
+      setIsDetectingGps(false);
+    }
+  };
+
+  const filteredLocalities = EXTENDED_KERALA_LOCALITIES.filter(
+    (loc) =>
+      loc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      loc.district.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      loc.pincode.includes(searchQuery)
+  );
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-[#E6EEE8] px-4 py-3">
@@ -41,24 +84,78 @@ export const AppHeader: React.FC = () => {
 
           {/* Locality Dropdown */}
           {isLocalityDropdownOpen && (
-            <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#E6EEE8] py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-3 py-1.5 text-xs font-semibold text-[#77847C] uppercase tracking-wider">
-                {language === 'ml' ? 'പ്രദേശം മാറ്റുക' : 'Select Locality'}
+            <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-[#E6EEE8] p-2.5 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-bold text-[#77847C] uppercase tracking-wider">
+                  {language === 'ml' ? 'പ്രദേശം മാറ്റുക' : 'Select Kerala Locality'}
+                </span>
+                <button
+                  onClick={() => setIsLocalityDropdownOpen(false)}
+                  className="text-xs text-[#77847C] hover:text-[#17251D]"
+                >
+                  ✕
+                </button>
               </div>
-              <div className="max-h-60 overflow-y-auto no-scrollbar">
-                {KERALA_LOCALITIES.map((loc) => (
+
+              {/* Live GPS Detection Button */}
+              <button
+                type="button"
+                onClick={handleHeaderGpsDetect}
+                disabled={isDetectingGps}
+                className="w-full py-2 px-3 rounded-xl bg-[#087A45] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs hover:bg-[#064B2E] transition-all disabled:opacity-75"
+              >
+                {isDetectingGps ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{language === 'ml' ? 'GPS പരിശോധിക്കുന്നു...' : 'Acquiring GPS...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>{t.create.useMyLiveLocation}</span>
+                  </>
+                )}
+              </button>
+
+              {/* Search Filter */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-[#77847C] absolute left-2.5 top-2.5" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={language === 'ml' ? 'സ്ഥലം തിരയുക...' : 'Search place, district, pin...'}
+                  className="w-full pl-8 pr-3 py-1.5 bg-[#F7FAF7] border border-[#E6EEE8] rounded-xl text-xs text-[#17251D] placeholder-[#77847C] outline-none focus:border-[#087A45]"
+                />
+              </div>
+
+              {/* List of localities */}
+              <div className="max-h-56 overflow-y-auto no-scrollbar space-y-1">
+                {filteredLocalities.slice(0, 15).map((loc) => (
                   <button
-                    key={loc.name}
+                    key={`${loc.name}-${loc.district}`}
                     onClick={() => {
                       setLocality(loc.name);
+                      setUserLocation({
+                        latitude: loc.lat,
+                        longitude: loc.lng,
+                        accuracy: 50,
+                        locality: loc.name,
+                        district: loc.district,
+                        state: 'Kerala',
+                        formattedAddress: `${loc.name}, ${loc.district}, Kerala (${loc.pincode})`,
+                        pincode: loc.pincode,
+                      });
                       setIsLocalityDropdownOpen(false);
                     }}
-                    className={`w-full text-left px-3.5 py-2 text-sm flex items-center justify-between hover:bg-[#F7FAF7] transition-colors ${
-                      currentLocality === loc.name ? 'text-[#087A45] font-semibold bg-[#E9F8ED]/60' : 'text-[#17251D]'
+                    className={`w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center justify-between hover:bg-[#F7FAF7] transition-colors ${
+                      currentLocality === loc.name
+                        ? 'text-[#087A45] font-bold bg-[#E9F8ED]'
+                        : 'text-[#17251D]'
                     }`}
                   >
                     <span>{loc.name}</span>
-                    <span className="text-xs text-[#77847C]">{loc.district}</span>
+                    <span className="text-[10px] text-[#77847C]">{loc.district}</span>
                   </button>
                 ))}
               </div>
@@ -92,4 +189,3 @@ export const AppHeader: React.FC = () => {
     </header>
   );
 };
-

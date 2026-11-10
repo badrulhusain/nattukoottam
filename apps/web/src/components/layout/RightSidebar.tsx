@@ -1,15 +1,37 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Clock, ArrowRight, Activity, TrendingUp } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 import { INITIAL_CONFLICTS_MOCK } from '../../lib/constants';
+import { fetchLiveConflicts } from '../../lib/api';
 
 export const RightSidebar: React.FC = () => {
-  const { language, setActiveTab } = useAppStore();
+  const { language, setActiveTab, currentLocality } = useAppStore();
   const t = getT(language);
-  const conflict = INITIAL_CONFLICTS_MOCK[0];
+  const [conflict, setConflict] = useState<any>(INITIAL_CONFLICTS_MOCK[0]);
+
+  useEffect(() => {
+    async function loadConflicts() {
+      const data = await fetchLiveConflicts(currentLocality);
+      if (data && Array.isArray(data) && data.length > 0) {
+        const first = data[0];
+        setConflict({
+          id: first.id,
+          title: `${first.projectA?.department?.name || 'PWD'} vs. ${first.projectB?.department?.name || 'KWA'} Overlap`,
+          projectA: first.projectA,
+          projectB: first.projectB,
+          locality: first.projectA?.locality || currentLocality,
+          roadName: first.projectA?.roadName || 'Seaport-Airport Road Junction',
+          distanceMeters: first.distanceMeters,
+          recommendedAction: first.jointPlan || first.notes || INITIAL_CONFLICTS_MOCK[0].recommendedAction,
+          status: first.status,
+        });
+      }
+    }
+    loadConflicts();
+  }, [currentLocality]);
 
   return (
     <aside className="hidden lg:flex flex-col w-80 h-[calc(100vh-65px)] sticky top-[65px] border-l border-[#E6EEE8] p-4 space-y-5 bg-white overflow-y-auto no-scrollbar">

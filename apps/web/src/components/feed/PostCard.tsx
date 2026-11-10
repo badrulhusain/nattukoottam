@@ -52,9 +52,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
               </span>
               <span className="text-xs text-[#77847C]">· {post.createdAt}</span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-[#77847C]">
+            <div className="flex items-center gap-1 text-xs text-[#77847C] flex-wrap">
               <MapPin className="w-3 h-3 text-[#087A45]" />
               <span>{post.locality}, {post.district}</span>
+              {post.latitude && post.longitude && (
+                <span className="text-[10px] text-[#087A45] font-mono bg-[#E9F8ED] px-1.5 py-0.5 rounded-md">
+                  {post.latitude.toFixed(3)}°, {post.longitude.toFixed(3)}°
+                </span>
+              )}
               {post.category && (
                 <>
                   <span>·</span>
@@ -84,6 +89,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <p className="text-sm text-[#17251D] leading-relaxed whitespace-pre-line font-normal">
         {post.content}
       </p>
+
+      {/* Street/Landmark Tag if available */}
+      {post.address && post.address !== `${post.locality}, ${post.district}` && (
+        <div className="flex items-center gap-1.5 text-xs text-[#064B2E] bg-[#E9F8ED]/60 px-3 py-1.5 rounded-xl border border-[#32C878]/30">
+          <MapPin className="w-3.5 h-3.5 text-[#087A45] flex-shrink-0" />
+          <span className="truncate">{post.address}</span>
+        </div>
+      )}
 
       {/* Media Image Carousel / Grid */}
       {post.mediaUrls && post.mediaUrls.length > 0 && (
