@@ -185,7 +185,7 @@ export class ProjectsService {
       }),
     ]);
 
-    return buildPaginatedResult(projects, total, query);
+    return projects;
   }
 
   async findAllConflicts(locality?: string) {

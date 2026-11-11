@@ -101,7 +101,7 @@ export class PostsService {
       commentsCount: post._count.comments,
     }));
 
-    return buildPaginatedResult(formatted, total, query);
+    return formatted;
   }
 
   async findOne(id: string, currentUserId?: string) {

@@ -11,11 +11,13 @@ async function bootstrap() {
   app.setGlobalPrefix(globalPrefix);
 
   // Security & Optimization Middleware
-  app.use(helmet());
+  app.use(helmet({ crossOriginResourcePolicy: false }));
   app.use(compression());
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => callback(null, true),
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With',
   });
 
   // Global DTO Validation
@@ -59,19 +61,9 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  // Set when Nx waits for this server to be ready
-  if (process.env.NX_READY_SIGNAL_SOCKET) {
-    try {
-      const load = new Function('s', 'return import(s)') as (s: string) => Promise<{ emitReadySignal(server: unknown): boolean }>;
-      (await load('@nx/js/ready-signal')).emitReadySignal(app.getHttpServer());
-    } catch {
-      // @nx/js isn't installed
-    }
-  }
-
-  Logger.log(`🚀 Naatukoottam API is running on: http://localhost:${port}/${globalPrefix}`);
+  Logger.log(`🚀 Naatukoottam API is running on: http://0.0.0.0:${port}/${globalPrefix}`);
   Logger.log(`📚 Swagger Documentation available at: http://localhost:${port}/api/docs`);
 }
 

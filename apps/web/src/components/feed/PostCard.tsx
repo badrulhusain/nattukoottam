@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import {
@@ -18,6 +18,7 @@ import {
 import { Post } from '../../types';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
+import { UserAvatar } from '../ui/UserAvatar';
 
 interface PostCardProps {
   post: Post;
@@ -30,21 +31,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [copied, setCopied] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
-  const [commentsList, setCommentsList] = useState<
-    Array<{ id: string; author: string; avatar: string; text: string; time: string }>
-  >([
-    {
-      id: 'c1',
-      author: 'Mathew Varghese',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
-      text:
-        language === 'ml'
-          ? 'ഇന്നലെ രാത്രി ഇവിടെ ഒരു ബൈക്ക് മറിഞ്ഞു. ഉടൻ പരിഹരിക്കേണ്ട കാര്യമാണ്!'
-          : 'A scooter skidded here yesterday evening. Needs immediate patch work!',
-      time: '15m ago',
-    },
-  ]);
-
+  const [commentsList, setCommentsList] = useState<Array<{ id: string; author: string; avatar: string; text: string; time: string }>>([]);
   const handleShare = () => {
     if (typeof window !== 'undefined') {
       navigator.clipboard?.writeText(window.location.href);
@@ -61,7 +48,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {
         id: `c_${Date.now()}`,
         author: currentUser.fullName,
-        avatar: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+        avatar: currentUser.avatarUrl || '',
         text: commentText.trim(),
         time: 'Just now',
       },
@@ -106,13 +93,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex-shrink-0">
-            <img
-              src={
-                post.author.avatarUrl ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'
-              }
-              alt={post.author.fullName}
-              className="w-10 h-10 rounded-full object-cover ring-2 ring-[#EAF7EF]"
+            <UserAvatar
+              src={post.author.avatarUrl}
+              name={post.author.fullName}
+              size="md"
+              className="ring-2 ring-[#EAF7EF]"
             />
             {post.isInfrastructureIssue && (
               <span className="absolute -bottom-1 -right-1 p-0.5 bg-[#16A34A] text-white rounded-full ring-1.5 ring-white">
@@ -303,12 +288,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {isCommentsOpen && (
         <div className="pt-3 border-t border-[#E4EBE6] space-y-3 animate-in fade-in duration-150">
           <div className="space-y-2.5">
-            {commentsList.map((comm) => (
+            {commentsList.length > 0 ? commentsList.map((comm) => (
               <div key={comm.id} className="flex items-start gap-2.5 text-xs">
-                <img
+                <UserAvatar
                   src={comm.avatar}
-                  alt={comm.author}
-                  className="w-7 h-7 rounded-full object-cover ring-1 ring-[#E4EBE6] flex-shrink-0"
+                  name={comm.author}
+                  size="xs"
+                  className="flex-shrink-0"
                 />
                 <div className="flex-1 bg-[#F8FAF8] rounded-xl p-2.5 border border-[#E4EBE6]">
                   <div className="flex items-center justify-between mb-0.5">
@@ -318,7 +304,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   <p className="text-[#17231D] leading-relaxed">{comm.text}</p>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="py-2 text-center text-[11px] text-[#718078]">
+                {language === 'ml' ? 'പ്രതികരണങ്ങൾ ഒന്നുമില്ല. ആദ്യത്തെ പ്രതികരണം രേഖപ്പെടുത്തൂ!' : 'No responses yet. Be the first to reply!'}
+              </div>
+            )}
           </div>
 
           {/* Quick Comment Input */}

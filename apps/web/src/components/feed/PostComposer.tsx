@@ -4,6 +4,7 @@ import React from 'react';
 import { Image as ImageIcon, MapPin, AlertCircle, Sparkles, Send } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
+import { UserAvatar } from '../ui/UserAvatar';
 
 export const PostComposer: React.FC = () => {
   const { currentUser, currentLocality, language, setIsCreateModalOpen } = useAppStore();
@@ -16,10 +17,11 @@ export const PostComposer: React.FC = () => {
     >
       <div className="flex items-center gap-3">
         <div className="relative flex-shrink-0">
-          <img
+          <UserAvatar
             src={currentUser.avatarUrl}
-            alt={currentUser.fullName}
-            className="w-10 h-10 rounded-full object-cover ring-2 ring-[#EAF7EF]"
+            name={currentUser.fullName}
+            size="md"
+            className="ring-2 ring-[#EAF7EF]"
           />
           <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#16A34A] ring-2 ring-white" />
         </div>

@@ -174,11 +174,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
         latitude: finalCoords.lat,
         longitude: finalCoords.lng,
         accuracy: finalCoords.accuracy,
-        mediaUrls: mediaUrl
-          ? [mediaUrl]
-          : [
-              'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80',
-            ],
+        mediaUrls: mediaUrl ? [mediaUrl] : [],
         isInfrastructureIssue: postType === 'grievance',
       });
 
@@ -187,12 +183,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
       setIsSubmitting(false);
     }, 300);
   };
-
-  const samplePhotoPresets = [
-    { label: 'Pothole Road', url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800' },
-    { label: 'Water Leak', url: 'https://images.unsplash.com/photo-1544377193-33dcf4d68fb5?w=800' },
-    { label: 'Sagging Wire', url: 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=800' },
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -452,20 +442,26 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
               <span>{t.create.addPhotos}</span>
             </div>
             <div className="flex items-center gap-2">
-              {samplePhotoPresets.map((preset) => (
+              <input
+                type="url"
+                value={mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                placeholder={
+                  language === 'ml'
+                    ? 'ചിത്രത്തിന്റെ ലിങ്ക് നൽകുക (ഓപ്ഷണൽ)...'
+                    : 'Enter image / photo URL (optional)...'
+                }
+                className="flex-1 p-2 bg-[#F8FAF8] border border-[#E4EBE6] rounded-xl text-xs text-[#17231D] outline-none focus:border-[#16A34A]"
+              />
+              {mediaUrl && (
                 <button
                   type="button"
-                  key={preset.label}
-                  onClick={() => setMediaUrl(preset.url)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors active-press ${
-                    mediaUrl === preset.url
-                      ? 'bg-[#EAF7EF] border-[#16A34A] text-[#16A34A]'
-                      : 'bg-white border-[#E4EBE6] text-[#17231D] hover:bg-[#F8FAF8]'
-                  }`}
+                  onClick={() => setMediaUrl('')}
+                  className="px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-xl font-medium"
                 >
-                  {preset.label}
+                  Clear
                 </button>
-              ))}
+              )}
             </div>
           </div>
 

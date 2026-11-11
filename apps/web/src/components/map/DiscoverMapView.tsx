@@ -17,46 +17,27 @@ import { getT } from '../../lib/translations';
 export const DiscoverMapView: React.FC = () => {
   const { language, posts, userLocation, toggleSupport } = useAppStore();
   const t = getT(language);
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(posts[0]?.id || null);
-
-  const selectedPost = posts.find((p) => p.id === selectedIssueId) || posts[0];
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
 
   const mapPins = [
-    {
-      id: 'post_01',
-      title: 'Infopark Road Potholes',
-      locality: 'Kakkanad',
-      lat: 10.0159,
-      lng: 76.3419,
-      urgency: 'HIGH',
-      category: 'ROAD_TRANSPORT',
-      supports: 634,
-    },
-    {
-      id: 'post_02',
-      title: 'Pipeline Leakage',
-      locality: 'Perinthalmanna',
-      lat: 10.976,
-      lng: 76.2254,
-      urgency: 'CRITICAL',
-      category: 'WATER_SUPPLY',
-      supports: 489,
-    },
-    {
-      id: 'post_03',
-      title: 'Tilted Electric Post',
-      locality: 'Aluva',
-      lat: 10.1076,
-      lng: 76.3516,
-      urgency: 'HIGH',
-      category: 'ELECTRICITY',
-      supports: 312,
-    },
+    ...posts
+      .filter((p) => p.latitude && p.longitude)
+      .map((p) => ({
+        id: p.id,
+        title: p.content.slice(0, 35) + (p.content.length > 35 ? '...' : ''),
+        locality: p.locality,
+        lat: p.latitude!,
+        lng: p.longitude!,
+        urgency: p.urgency || 'HIGH',
+        category: p.category || 'OTHER',
+        supports: p.supportsCount,
+        isUserLoc: false,
+      })),
     ...(userLocation
       ? [
           {
             id: 'user_live_loc',
-            title: 'Your Location',
+            title: language === 'ml' ? 'നിങ്ങളുടെ ലൊക്കേഷൻ' : 'Your Location',
             locality: userLocation.locality,
             lat: userLocation.latitude,
             lng: userLocation.longitude,
@@ -69,42 +50,52 @@ export const DiscoverMapView: React.FC = () => {
       : []),
   ];
 
+  const selectedPost = posts.find((p) => p.id === selectedIssueId) || (posts.length > 0 ? posts[0] : null);
+
   return (
     <div className="space-y-4 pb-20">
       {/* Map Card */}
       <div className="relative w-full h-84 rounded-2xl overflow-hidden border border-[#E4EBE6] shadow-2xs bg-gradient-to-b from-[#EAF7EF]/60 to-[#F8FAF8] flex flex-col justify-between p-4">
-        {/* Subtle grid pattern */}
-        <div className="absolute inset-0 bg-[radial-gradient(#16A34A_1px,transparent_1px)] [background-size:20px_20px] opacity-15" />
+        {/* Soft Grid Background Pattern representing Map Coordinates */}
+        <div className="absolute inset-0 opacity-25 bg-[linear-gradient(to_right,#16A34A15_1px,transparent_1px),linear-gradient(to_bottom,#16A34A15_1px,transparent_1px)] bg-[size:28px_28px]" />
 
-        {/* Top Radar Bar */}
+        {/* Map Top Bar */}
         <div className="relative z-10 flex items-center justify-between">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-[#E4EBE6] text-xs font-bold text-[#16A34A] shadow-xs">
-            <Compass className="w-3.5 h-3.5 text-[#16A34A]" />
-            <span>Kerala Ward Radar</span>
+          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-[#E4EBE6] shadow-xs">
+            <Compass className="w-4 h-4 text-[#16A34A]" />
+            <span className="text-xs font-bold text-[#17231D]">
+              {language === 'ml' ? 'കേരള വാർഡ് റഡാർ മാപ്പ്' : 'Kerala Ward Radar'}
+            </span>
           </div>
-          <span className="text-[11px] font-semibold bg-white/95 px-3 py-1 rounded-full text-[#718078] border border-[#E4EBE6]">
-            3 Verified Hotspots
-          </span>
+
+          <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-xs px-2.5 py-1 rounded-xl border border-[#E4EBE6] text-[11px] font-semibold text-[#16A34A]">
+            <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-ping" />
+            <span>{mapPins.length} {language === 'ml' ? 'പോയിന്റുകൾ' : 'Hotspots'}</span>
+          </div>
         </div>
 
-        {/* Interactive Map Pins */}
-        <div className="relative z-10 flex-1 flex items-center justify-around px-4">
-          {mapPins.map((pin) => {
+        {/* Dynamic Pins Representation */}
+        <div className="relative z-10 w-full flex-1 flex items-center justify-around py-6">
+          {mapPins.map((pin, idx) => {
             const isSelected = selectedIssueId === pin.id;
             return (
               <button
                 key={pin.id}
-                onClick={() => setSelectedIssueId(pin.id)}
-                className={`flex flex-col items-center group transition-transform active-press ${
-                  isSelected ? 'scale-110 z-20' : 'hover:scale-105'
+                onClick={() => {
+                  if (!(pin as any).isUserLoc) {
+                    setSelectedIssueId(pin.id);
+                  }
+                }}
+                className={`group flex flex-col items-center transition-all ${
+                  idx % 2 === 0 ? '-translate-y-3' : 'translate-y-3'
                 }`}
               >
                 <div
-                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold shadow-xs whitespace-nowrap mb-1 transition-colors ${
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold mb-1 shadow-xs transition-transform group-hover:scale-105 ${
                     (pin as any).isUserLoc
                       ? 'bg-blue-600 text-white'
                       : isSelected
-                      ? 'bg-[#16A34A] text-white shadow-xs'
+                      ? 'bg-[#16A34A] text-white'
                       : 'bg-white text-[#17231D] border border-[#E4EBE6]'
                   }`}
                 >
@@ -138,7 +129,7 @@ export const DiscoverMapView: React.FC = () => {
       </div>
 
       {/* Selected Hotspot Inspection Card */}
-      {selectedPost && (
+      {selectedPost ? (
         <div className="bg-white rounded-2xl p-5 border border-[#E4EBE6] shadow-2xs space-y-3.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#16A34A] bg-[#EAF7EF] border border-[#D1EBD9] px-2.5 py-0.5 rounded-md">
@@ -150,7 +141,7 @@ export const DiscoverMapView: React.FC = () => {
             </div>
           </div>
 
-          <h3 className="font-bold text-sm text-[#17251D] leading-snug">
+          <h3 className="font-bold text-sm text-[#17231D] leading-snug">
             {selectedPost.content}
           </h3>
 
@@ -171,6 +162,20 @@ export const DiscoverMapView: React.FC = () => {
               {selectedPost.commentsCount} {t.feed.comments}
             </span>
           </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl p-8 text-center border border-[#E4EBE6] shadow-2xs space-y-2">
+          <div className="w-10 h-10 rounded-full bg-[#EAF7EF] text-[#16A34A] flex items-center justify-center mx-auto">
+            <Compass className="w-5 h-5" />
+          </div>
+          <h4 className="text-sm font-bold text-[#17231D]">
+            {language === 'ml' ? 'മാപ്പിൽ റിപ്പോർട്ടുകൾ ഒന്നുമില്ല' : 'No geo-tagged reports yet'}
+          </h4>
+          <p className="text-xs text-[#718078] max-w-xs mx-auto">
+            {language === 'ml'
+              ? 'നിങ്ങളുടെ പ്രദേശത്ത് പുതിയൊരു പരാതിയോ പൊതുവിവരമോ രേഖപ്പെടുത്തൂ.'
+              : 'Add GPS coordinates when reporting an issue to view it on the community map.'}
+          </p>
         </div>
       )}
     </div>

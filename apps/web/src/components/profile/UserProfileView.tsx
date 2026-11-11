@@ -14,10 +14,20 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  LogOut,
+  LogIn,
 } from 'lucide-react';
+import { UserAvatar } from '../ui/UserAvatar';
 
 export const UserProfileView: React.FC = () => {
-  const { currentUser, posts, language } = useAppStore();
+  const {
+    currentUser,
+    posts,
+    language,
+    isAuthenticated,
+    setIsAuthModalOpen,
+    logout,
+  } = useAppStore();
   const t = getT(language);
   const [activeTab, setActiveTab] = useState<'posts' | 'grievances' | 'supported' | 'about'>('posts');
 
@@ -45,20 +55,23 @@ export const UserProfileView: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 -mt-12 sm:-mt-14 mb-4">
             {/* Avatar & Badges */}
             <div className="relative inline-block">
-              <img
+              <UserAvatar
                 src={currentUser.avatarUrl}
-                alt={currentUser.fullName}
-                className="w-22 h-22 sm:w-24 sm:h-24 rounded-full object-cover ring-4 ring-white shadow-md bg-white"
+                name={currentUser.fullName}
+                size="xl"
+                className="ring-4 ring-white shadow-md"
               />
-              <span
-                className="absolute bottom-1 right-1 p-1 bg-[#16A34A] text-white rounded-full ring-2 ring-white shadow-xs"
-                title="Verified Citizen Volunteer"
-              >
-                <CheckCircle2 className="w-4 h-4 fill-current text-white" />
-              </span>
+              {isAuthenticated && (
+                <span
+                  className="absolute bottom-1 right-1 p-1 bg-[#16A34A] text-white rounded-full ring-2 ring-white shadow-xs"
+                  title="Verified Citizen"
+                >
+                  <CheckCircle2 className="w-4 h-4 fill-current text-white" />
+                </span>
+              )}
             </div>
 
-            {/* Actions: Edit Profile & Share */}
+            {/* Actions: Edit Profile, Share & Auth */}
             <div className="flex items-center gap-2 pt-1 sm:pt-0">
               <button className="py-2 px-3.5 rounded-xl bg-[#EAF7EF] hover:bg-[#d8f2de] text-[#16A34A] font-bold text-xs transition-colors flex items-center gap-1.5 border border-[#D1EBD9] active-press">
                 <Edit3 className="w-3.5 h-3.5" />
@@ -68,6 +81,24 @@ export const UserProfileView: React.FC = () => {
                 <Share2 className="w-3.5 h-3.5" />
                 <span>{t.profile.shareProfile}</span>
               </button>
+              {isAuthenticated ? (
+                <button
+                  onClick={() => logout()}
+                  className="py-2 px-3.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-semibold text-xs transition-colors flex items-center gap-1.5 active-press"
+                  title="Sign out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{t.auth.logout}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsAuthModalOpen(true, 'login')}
+                  className="py-2 px-3.5 rounded-xl bg-[#16A34A] text-white font-bold text-xs hover:bg-[#15803D] transition-colors flex items-center gap-1.5 shadow-xs active-press"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>{t.auth.signIn}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -75,20 +106,31 @@ export const UserProfileView: React.FC = () => {
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-extrabold text-[#17231D] tracking-tight">
-                {currentUser.fullName}
+                {isAuthenticated ? currentUser.fullName : (language === 'ml' ? 'അതിഥി പൗരൻ' : 'Guest Citizen')}
               </h1>
-              <span className="text-[10px] font-bold bg-[#EAF7EF] text-[#16A34A] px-2 py-0.5 rounded-md border border-[#D1EBD9]">
-                {language === 'ml' ? 'സന്നദ്ധ പ്രവർത്തകൻ' : 'Citizen Contributor'}
-              </span>
+              {isAuthenticated && (
+                <span className="text-[10px] font-bold bg-[#EAF7EF] text-[#16A34A] px-2 py-0.5 rounded-md border border-[#D1EBD9]">
+                  {currentUser.role === 'DEPARTMENT_OFFICIAL' ? '🏛️ Official' : '🌿 Citizen'}
+                </span>
+              )}
             </div>
             <div className="text-xs text-[#718078] font-medium">
-              @{currentUser.username} · {currentUser.locality} Ward 14
+              {isAuthenticated ? `@${currentUser.username} · ${currentUser.locality}` : (language === 'ml' ? 'ലോഗിൻ ചെയ്തിട്ടില്ല' : 'Not logged in')}
             </div>
 
             {/* Bio */}
-            <p className="text-xs sm:text-sm text-[#17231D] leading-relaxed pt-1 max-w-xl">
-              {currentUser.bio}
-            </p>
+            {currentUser.bio && (
+              <p className="text-xs sm:text-sm text-[#17231D] leading-relaxed pt-1 max-w-xl">
+                {currentUser.bio}
+              </p>
+            )}
+            {!isAuthenticated && (
+              <p className="text-xs text-[#718078] leading-relaxed pt-1 max-w-xl">
+                {language === 'ml' 
+                  ? 'നിങ്ങളുടെ പരാതികളും പ്രാദേശിക ഇടപെടലുകളും കാണാൻ പ്രവേശിക്കുക അല്ലെങ്കിൽ അക്കൗണ്ട് തുടങ്ങുക.'
+                  : 'Sign in or create an account to track your reported grievances and civic support.'}
+              </p>
+            )}
 
             {/* Tags / Interests */}
             {currentUser.interests && (

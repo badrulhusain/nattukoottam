@@ -126,7 +126,7 @@ export class IssuesService {
       supportsCount: issue._count.supports,
     }));
 
-    return buildPaginatedResult(formatted, total, query);
+    return formatted;
   }
 
   async findOne(id: string, currentUserId?: string) {

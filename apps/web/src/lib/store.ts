@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { Language, Post, User } from '../types';
-import { CURRENT_USER_MOCK, INITIAL_POSTS_MOCK, KERALA_LOCALITIES } from './constants';
+import { GUEST_USER, INITIAL_POSTS_MOCK, KERALA_LOCALITIES } from './constants';
 import { DetectedLocation } from './geolocation';
+import { removeStoredTokens } from './api';
 
 interface AppState {
   language: Language;
@@ -11,6 +12,12 @@ interface AppState {
   userLocation: DetectedLocation | null;
   setUserLocation: (loc: DetectedLocation | null) => void;
   currentUser: User;
+  isAuthenticated: boolean;
+  isAuthModalOpen: boolean;
+  authModalMode: 'login' | 'register' | 'forgot_password';
+  setIsAuthModalOpen: (open: boolean, mode?: 'login' | 'register' | 'forgot_password') => void;
+  login: (user: User) => void;
+  logout: () => void;
   activeTab: 'home' | 'grievances' | 'discover' | 'notifications' | 'profile' | 'official';
   setActiveTab: (tab: 'home' | 'grievances' | 'discover' | 'notifications' | 'profile' | 'official') => void;
   activeCategory: string;
@@ -18,6 +25,7 @@ interface AppState {
   feedFilter: 'forYou' | 'nearby' | 'following' | 'trending';
   setFeedFilter: (filter: 'forYou' | 'nearby' | 'following' | 'trending') => void;
   posts: Post[];
+  setPosts: (posts: Post[]) => void;
   addPost: (newPost: Omit<Post, 'id' | 'createdAt' | 'likesCount' | 'supportsCount' | 'commentsCount' | 'sharesCount'>) => void;
   toggleLike: (postId: string) => void;
   toggleSupport: (postId: string) => void;
@@ -45,7 +53,29 @@ export const useAppStore = create<AppState>((set) => ({
           }
         : state.currentUser,
     })),
-  currentUser: CURRENT_USER_MOCK,
+  currentUser: GUEST_USER,
+  isAuthenticated: false,
+  isAuthModalOpen: false,
+  authModalMode: 'login',
+  setIsAuthModalOpen: (isAuthModalOpen, mode) =>
+    set((state) => ({
+      isAuthModalOpen,
+      authModalMode: mode || state.authModalMode,
+    })),
+  login: (user: User) =>
+    set({
+      currentUser: user,
+      isAuthenticated: true,
+      isAuthModalOpen: false,
+      currentLocality: user.locality || 'Kakkanad',
+    }),
+  logout: () => {
+    removeStoredTokens();
+    set({
+      isAuthenticated: false,
+      currentUser: GUEST_USER,
+    });
+  },
   activeTab: 'home',
   setActiveTab: (activeTab) => set({ activeTab }),
   activeCategory: 'all',
@@ -53,6 +83,7 @@ export const useAppStore = create<AppState>((set) => ({
   feedFilter: 'forYou',
   setFeedFilter: (feedFilter) => set({ feedFilter }),
   posts: INITIAL_POSTS_MOCK,
+  setPosts: (posts) => set({ posts }),
   isOnboardingOpen: false,
   setIsOnboardingOpen: (isOnboardingOpen) => set({ isOnboardingOpen }),
   isCreateModalOpen: false,

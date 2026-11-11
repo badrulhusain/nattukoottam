@@ -1,11 +1,10 @@
 import './global.css';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin'],
+const meera = localFont({
+  src: './fonts/meera-regular.ttf',
+  variable: '--font-meera',
   display: 'swap',
-  variable: '--font-sans',
-  weight: ['400', '500', '600', '700', '800'],
 });
 
 export const metadata = {
@@ -28,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={plusJakartaSans.variable}>
+    <html lang="ml" className={meera.variable}>
       <body className="antialiased selection:bg-[#16A34A] selection:text-white min-h-screen bg-[#F8FAF8] text-[#17231D]">
         {children}
       </body>

@@ -12,9 +12,12 @@ import {
   MapPin,
   Sparkles,
   TrendingUp,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
+import { UserAvatar } from '../ui/UserAvatar';
 
 export const DesktopSidebar: React.FC = () => {
   const {
@@ -23,6 +26,9 @@ export const DesktopSidebar: React.FC = () => {
     language,
     currentUser,
     currentLocality,
+    isAuthenticated,
+    setIsAuthModalOpen,
+    logout,
     setIsCreateModalOpen,
   } = useAppStore();
   const t = getT(language);
@@ -120,28 +126,56 @@ export const DesktopSidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* User Quick Profile at Bottom */}
-      <div
-        onClick={() => setActiveTab('profile')}
-        className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#F8FAF8] border border-transparent hover:border-[#E4EBE6] transition-all cursor-pointer group"
-      >
-        <div className="relative">
-          <img
-            src={currentUser.avatarUrl}
-            alt={currentUser.fullName}
-            className="w-10 h-10 rounded-full object-cover ring-2 ring-[#EAF7EF] group-hover:ring-[#16A34A]/40 transition-all"
-          />
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#16A34A] ring-2 ring-white" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-xs font-bold text-[#17231D] truncate group-hover:text-[#16A34A] transition-colors">
-            {currentUser.fullName}
+      {/* User Quick Profile / Auth Callout at Bottom */}
+      {isAuthenticated ? (
+        <div className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8FAF8] border border-transparent hover:border-[#E4EBE6] transition-all group">
+          <div
+            onClick={() => setActiveTab('profile')}
+            className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+          >
+            <div className="relative">
+              <UserAvatar
+                src={currentUser.avatarUrl}
+                name={currentUser.fullName}
+                size="sm"
+                className="group-hover:ring-[#16A34A]/40 transition-all"
+              />
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#16A34A] ring-2 ring-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-[#17231D] truncate group-hover:text-[#16A34A] transition-colors">
+                {currentUser.fullName}
+              </div>
+              <div className="text-[10px] text-[#718078] truncate">
+                {currentUser.role === 'DEPARTMENT_OFFICIAL' ? '🏛️ Official' : '🌿 Citizen'} · {currentUser.locality}
+              </div>
+            </div>
           </div>
-          <div className="text-[11px] text-[#718078] truncate">
-            @{currentUser.username}
-          </div>
+          <button
+            onClick={() => logout()}
+            className="p-1.5 rounded-lg text-[#718078] hover:text-red-600 hover:bg-red-50 transition-colors"
+            title={t.auth.logout}
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
-      </div>
+      ) : (
+        <div className="p-3 rounded-2xl bg-[#EAF7EF]/70 border border-[#D1EBD9] space-y-2">
+          <div className="text-xs font-bold text-[#16A34A] flex items-center gap-1.5">
+            <LogIn className="w-3.5 h-3.5" />
+            <span>{t.auth.signIn}</span>
+          </div>
+          <p className="text-[11px] text-[#718078] leading-tight">
+            Sign in to report civic problems and track PWD & KWA work.
+          </p>
+          <button
+            onClick={() => setIsAuthModalOpen(true, 'login')}
+            className="w-full py-1.5 px-3 rounded-xl bg-[#16A34A] text-white font-bold text-xs hover:bg-[#15803D] transition-colors shadow-2xs active-press"
+          >
+            {t.auth.loginCta}
+          </button>
+        </div>
+      )}
     </aside>
   );
 };

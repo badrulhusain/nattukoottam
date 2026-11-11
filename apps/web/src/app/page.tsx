@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAppStore } from '../lib/store';
 import { getT } from '../lib/translations';
+import { fetchLivePosts, getCurrentUserApi } from '../lib/api';
+import { Post } from '../types';
 import { AppHeader } from '../components/layout/AppHeader';
 import { BottomNav } from '../components/layout/BottomNav';
 import { DesktopSidebar } from '../components/layout/DesktopSidebar';
@@ -13,6 +15,7 @@ import { StoriesBar } from '../components/feed/StoriesBar';
 import { PostCard } from '../components/feed/PostCard';
 import { OnboardingModal } from '../components/onboarding/OnboardingModal';
 import { CreatePostModal } from '../components/create/CreatePostModal';
+import { AuthModal } from '../components/auth/AuthModal';
 import { UserProfileView } from '../components/profile/UserProfileView';
 import { OfficialPortalView } from '../components/official/OfficialPortalView';
 import { DiscoverMapView } from '../components/map/DiscoverMapView';
@@ -25,12 +28,83 @@ export default function Home() {
     feedFilter,
     setFeedFilter,
     posts,
+    setPosts,
     activeCategory,
     currentLocality,
     language,
+    login,
     setIsCreateModalOpen,
   } = useAppStore();
   const t = getT(language);
+
+  // Restore authenticated session from stored JWT if valid
+  useEffect(() => {
+    async function restoreSession() {
+      const user = await getCurrentUserApi();
+      if (user) {
+        login({
+          id: user.id,
+          fullName: user.fullName,
+          username: user.email?.split('@')[0] || user.phone?.slice(-6) || 'user',
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          district: user.district,
+          locality: user.locality,
+          avatarUrl: user.avatarUrl || '',
+          bio: user.bio || '',
+          interests: [],
+          followersCount: 0,
+          followingCount: 0,
+          grievancesCount: 0,
+          postsCount: 0,
+          preferredLang: (user.preferredLang as any) || 'ml',
+        });
+      }
+    }
+    restoreSession();
+  }, [login]);
+
+  // Sync live posts from Neon backend
+  useEffect(() => {
+    async function loadLivePosts() {
+      const res = await fetchLivePosts(currentLocality);
+      const items = Array.isArray(res) ? res : res?.data || [];
+      if (items.length > 0) {
+        const mapped: Post[] = items.map((p: any) => ({
+          id: p.id,
+          author: {
+            id: p.author?.id || 'anon',
+            fullName: p.author?.fullName || 'Community Member',
+            username: p.author?.username || p.author?.fullName?.toLowerCase().replace(/\s+/g, '_') || 'user',
+            avatarUrl: p.author?.avatarUrl || '',
+            locality: p.author?.locality || p.locality,
+          },
+          content: p.content,
+          category: p.category,
+          urgency: p.urgency || 'HIGH',
+          locality: p.locality,
+          district: p.district,
+          latitude: p.latitude,
+          longitude: p.longitude,
+          mediaUrls: p.media && p.media.length > 0 ? p.media.map((m: any) => m.mediaUrl) : [],
+          likesCount: p.likesCount ?? p._count?.likes ?? 0,
+          isLiked: Boolean(p.isLiked),
+          supportsCount: p.supportsCount ?? 1,
+          isSupported: Boolean(p.isSupported),
+          commentsCount: p.commentsCount ?? p._count?.comments ?? 0,
+          sharesCount: 0,
+          createdAt: 'Just now',
+          isInfrastructureIssue: true,
+        }));
+
+        setPosts(mapped);
+      } else {
+        setPosts([]);
+      }
+    }
+    loadLivePosts();
+  }, [currentLocality, setPosts]);
 
   // Filter posts based on activeCategory
   const filteredPosts = posts.filter((p) => {
@@ -39,7 +113,10 @@ export default function Home() {
   });
 
   return (
-    <div className="min-h-screen bg-[#F8FAF8] text-[#17231D] flex flex-col font-sans">
+    <div
+      lang={language}
+      className="min-h-screen bg-[#F8FAF8] text-[#17231D] flex flex-col font-meera"
+    >
       {/* Top Application Header */}
       <AppHeader />
 
@@ -161,6 +238,9 @@ export default function Home() {
 
       {/* Issue Reporting / Post Creator Bottom Sheet */}
       <CreatePostModal />
+
+      {/* Authentication Modal (Login / Register / Account Setup) */}
+      <AuthModal />
     </div>
   );
 }

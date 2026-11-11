@@ -29,6 +29,8 @@ export interface User {
   id: string;
   fullName: string;
   username: string;
+  email?: string;
+  phone?: string;
   role: Role;
   district: string;
   locality: string;

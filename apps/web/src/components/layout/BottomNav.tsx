@@ -25,7 +25,7 @@ export const BottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E4EBE6] py-1 px-4 sm:hidden shadow-lg shadow-black/5">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E4EBE6] pt-1.5 pb-[max(env(safe-area-inset-bottom),0.625rem)] px-4 sm:hidden shadow-lg shadow-black/5">
       <div className="flex items-center justify-between max-w-md mx-auto">
         {navItems.map((item) => {
           if (item.isAction) {
