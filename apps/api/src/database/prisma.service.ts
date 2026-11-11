@@ -6,12 +6,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit() {
-    try {
-      await this.$connect();
-      this.logger.log('Connected to Neon PostgreSQL Database successfully.');
-    } catch (error) {
-      this.logger.error('Failed to connect to Neon PostgreSQL Database', error);
-      throw error;
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.$connect();
+        this.logger.log('Connected to Neon PostgreSQL Database successfully.');
+        return;
+      } catch (error: any) {
+        this.logger.warn(`Database connection attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+        if (attempt === maxRetries) {
+          this.logger.error('Could not connect to Neon PostgreSQL Database on startup. Endpoints requiring DB may fail until connection is re-established.');
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
     }
   }
 

@@ -17,6 +17,7 @@ import { UserProfileView } from '../components/profile/UserProfileView';
 import { OfficialPortalView } from '../components/official/OfficialPortalView';
 import { DiscoverMapView } from '../components/map/DiscoverMapView';
 import { NotificationsView } from '../components/notifications/NotificationsView';
+import { AlertCircle, Sparkles, Filter, Plus } from 'lucide-react';
 
 export default function Home() {
   const {
@@ -27,6 +28,7 @@ export default function Home() {
     activeCategory,
     currentLocality,
     language,
+    setIsCreateModalOpen,
   } = useAppStore();
   const t = getT(language);
 
@@ -37,7 +39,7 @@ export default function Home() {
   });
 
   return (
-    <div className="min-h-screen bg-[#F7FAF7] text-[#17251D] flex flex-col">
+    <div className="min-h-screen bg-[#F8FAF8] text-[#17231D] flex flex-col font-sans">
       {/* Top Application Header */}
       <AppHeader />
 
@@ -49,25 +51,25 @@ export default function Home() {
         {/* Center Column: Social Feed & Dynamic Views */}
         <main className="w-full max-w-2xl px-3 sm:px-6 py-4 flex-1">
           {activeTab === 'home' && (
-            <div className="space-y-4 pb-20 sm:pb-8">
-              {/* Active Community Circles (Inspired by Reference Image 2) */}
+            <div className="space-y-4 pb-24 sm:pb-8">
+              {/* Active Ward Circles */}
               <StoriesBar />
 
-              {/* Quick Post Composer Input (Inspired by Reference Image 1) */}
+              {/* Quick Post Composer Input */}
               <PostComposer />
 
               {/* Feed Mode Tabs (For You / Nearby / Following / Trending) */}
-              <div className="flex items-center justify-between border-b border-[#E6EEE8] px-1 pt-1">
+              <div className="bg-white rounded-2xl p-1 border border-[#E4EBE6] shadow-2xs flex items-center justify-between">
                 {(['forYou', 'nearby', 'following', 'trending'] as const).map((filter) => {
                   const isActive = feedFilter === filter;
                   return (
                     <button
                       key={filter}
                       onClick={() => setFeedFilter(filter)}
-                      className={`pb-2.5 px-2 text-xs font-semibold capitalize transition-all border-b-2 -mb-[1px] ${
+                      className={`flex-1 py-2 px-2 text-xs font-semibold capitalize rounded-xl transition-all active-press ${
                         isActive
-                          ? 'border-[#087A45] text-[#087A45]'
-                          : 'border-transparent text-[#77847C] hover:text-[#17251D]'
+                          ? 'bg-[#EAF7EF] text-[#16A34A] font-bold shadow-2xs border border-[#D1EBD9]'
+                          : 'text-[#718078] hover:text-[#17231D]'
                       }`}
                     >
                       {t.feed[filter]}
@@ -80,13 +82,27 @@ export default function Home() {
               <CategoryBar />
 
               {/* Posts Feed List */}
-              <div className="space-y-3.5 pt-1">
+              <div className="space-y-3 pt-1">
                 {filteredPosts.length > 0 ? (
                   filteredPosts.map((post) => <PostCard key={post.id} post={post} />)
                 ) : (
-                  <div className="bg-white rounded-3xl p-8 text-center border border-[#E6EEE8] space-y-2">
-                    <p className="text-sm font-semibold text-[#17251D]">{t.feed.emptyFeed}</p>
-                    <p className="text-xs text-[#77847C]">{t.feed.beFirst}</p>
+                  <div className="bg-white rounded-2xl p-8 text-center border border-[#E4EBE6] shadow-2xs space-y-3">
+                    <div className="w-12 h-12 rounded-full bg-[#EAF7EF] text-[#16A34A] flex items-center justify-center mx-auto">
+                      <Sparkles className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-[#17231D]">{t.feed.emptyFeed}</h4>
+                      <p className="text-xs text-[#718078] mt-1 max-w-xs mx-auto">
+                        {t.feed.beFirst}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#16A34A] text-white text-xs font-bold hover:bg-[#15803D] transition-colors active-press shadow-xs"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{t.nav.createPost}</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -94,13 +110,27 @@ export default function Home() {
           )}
 
           {activeTab === 'grievances' && (
-            <div className="space-y-4 pb-20 sm:pb-8">
-              <div className="flex items-center justify-between px-1">
-                <h2 className="text-lg font-bold text-[#17251D]">{t.nav.grievances}</h2>
-                <span className="text-xs text-[#087A45] font-semibold">{currentLocality}</span>
+            <div className="space-y-4 pb-24 sm:pb-8">
+              <div className="bg-white rounded-2xl p-4 border border-[#E4EBE6] shadow-2xs flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-[#17231D] flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                    <span>{t.nav.grievances}</span>
+                  </h2>
+                  <p className="text-xs text-[#718078] mt-0.5">
+                    {language === 'ml'
+                      ? `${currentLocality} വാർഡിൽ റിപ്പോർട്ട് ചെയ്യപ്പെട്ട പ്രശ്നങ്ങൾ`
+                      : `Active citizen grievances in ${currentLocality}`}
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-[#16A34A] bg-[#EAF7EF] border border-[#D1EBD9] px-3 py-1 rounded-full">
+                  {currentLocality}
+                </span>
               </div>
+
               <CategoryBar />
-              <div className="space-y-3.5">
+
+              <div className="space-y-3">
                 {filteredPosts
                   .filter((p) => p.isInfrastructureIssue)
                   .map((post) => (
@@ -126,7 +156,7 @@ export default function Home() {
       {/* Mobile Bottom Dock Navigation */}
       <BottomNav />
 
-      {/* Onboarding Welcome Screen (Center Phone in Image 1) */}
+      {/* Onboarding Welcome Screen */}
       <OnboardingModal />
 
       {/* Issue Reporting / Post Creator Bottom Sheet */}
