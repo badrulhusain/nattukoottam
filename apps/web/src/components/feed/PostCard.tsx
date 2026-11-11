@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import {
@@ -14,24 +14,66 @@ import {
   Send,
   AlertCircle,
   Eye,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import { Post } from '../../types';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 import { UserAvatar } from '../ui/UserAvatar';
+import { toggleLikeApi, toggleSupportApi, deletePostOrIssueApi } from '../../lib/api';
 
 interface PostCardProps {
   post: Post;
 }
 
 export const PostCard: React.FC<PostCardProps> = ({ post }) => {
-  const { language, toggleLike, toggleSupport, currentUser } = useAppStore();
+  const {
+    language,
+    toggleLike,
+    toggleSupport,
+    currentUser,
+    deletePost,
+    isAuthenticated,
+    setIsAuthModalOpen,
+  } = useAppStore();
   const t = getT(language);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [copied, setCopied] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commentsList, setCommentsList] = useState<Array<{ id: string; author: string; avatar: string; text: string; time: string }>>([]);
+
+  const isAuthor =
+    Boolean(
+      currentUser?.id &&
+        (currentUser.id === post.author.id ||
+          currentUser.username === post.author.username ||
+          (currentUser.fullName &&
+            post.author.fullName &&
+            currentUser.fullName.trim().toLowerCase() === post.author.fullName.trim().toLowerCase()))
+    ) || currentUser?.role === 'ADMIN';
+
+  const handleDelete = async () => {
+    const confirmMsg =
+      language === 'ml'
+        ? 'ഈ പോസ്റ്റ് ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ?'
+        : 'Are you sure you want to delete this post?';
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsDeleting(true);
+    try {
+      await deletePostOrIssueApi(post.id, post.isInfrastructureIssue);
+    } catch (err) {
+      console.warn('API delete post error:', err);
+    } finally {
+      deletePost(post.id);
+      setIsDeleting(false);
+      setIsMenuOpen(false);
+    }
+  };
   const handleShare = () => {
     if (typeof window !== 'undefined') {
       navigator.clipboard?.writeText(window.location.href);
@@ -40,8 +82,38 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
     }
   };
 
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true, 'login');
+      return;
+    }
+    toggleLike(post.id);
+    try {
+      await toggleLikeApi(post.id);
+    } catch (err) {
+      console.debug('Like sync skipped:', err);
+    }
+  };
+
+  const handleSupport = async () => {
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true, 'login');
+      return;
+    }
+    toggleSupport(post.id);
+    try {
+      await toggleSupportApi(post.id);
+    } catch (err) {
+      console.debug('Support sync skipped:', err);
+    }
+  };
+
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true, 'login');
+      return;
+    }
     if (!commentText.trim()) return;
     setCommentsList((prev) => [
       ...prev,
@@ -145,13 +217,68 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
             </span>
           )}
 
-          <button
-            type="button"
-            className="p-1 rounded-lg text-[#718078] hover:text-[#17231D] hover:bg-[#F8FAF8] transition-colors"
-            title="Options"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-1 rounded-lg text-[#718078] hover:text-[#17231D] hover:bg-[#F8FAF8] transition-colors active-press"
+              title="Options"
+              aria-label="Options"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+
+            {isMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-20"
+                  onClick={() => setIsMenuOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-lg border border-[#E4EBE6] py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                  {isAuthor && (
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={handleDelete}
+                      className="w-full px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors disabled:opacity-50"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>{language === 'ml' ? 'ഇല്ലാതാക്കുന്നു...' : 'Deleting...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>{language === 'ml' ? 'പോസ്റ്റ് ഇല്ലാതാക്കുക' : 'Delete Post'}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleShare();
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full px-3 py-2 text-left text-xs font-semibold text-[#17231D] hover:bg-[#F8FAF8] flex items-center gap-2 transition-colors"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-[#718078]" />
+                    <span>
+                      {copied
+                        ? language === 'ml'
+                          ? 'പകർത്തി!'
+                          : 'Copied!'
+                        : language === 'ml'
+                        ? 'ലിങ്ക് പകർത്തുക'
+                        : 'Copy link'}
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -214,7 +341,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         <div className="flex items-center gap-2">
           {/* Civic Innovation Button: "I Face This Too" */}
           <button
-            onClick={() => toggleSupport(post.id)}
+            onClick={handleSupport}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active-press ${
               post.isSupported
                 ? 'bg-[#16A34A] text-white shadow-xs'
@@ -233,7 +360,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
           {/* Like Button */}
           <button
-            onClick={() => toggleLike(post.id)}
+            onClick={handleLike}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all active-press ${
               post.isLiked
                 ? 'text-red-600 bg-red-50 border border-red-200'
@@ -260,7 +387,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
             }`}
           >
             <MessageSquare className="w-4 h-4" />
-            <span>{post.commentsCount + (commentsList.length - 1)}</span>
+            <span>{(post.commentsCount || 0) + commentsList.length}</span>
           </button>
 
           {/* Share Trigger */}
@@ -317,6 +444,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
               type="text"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
+              onFocus={() => {
+                if (!isAuthenticated) {
+                  setIsAuthModalOpen(true, 'login');
+                }
+              }}
               placeholder={
                 language === 'ml'
                   ? 'അഭിപ്രായം രേഖപ്പെടുത്തൂ...'

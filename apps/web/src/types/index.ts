@@ -145,3 +145,22 @@ export interface NotificationItem {
   targetId?: string;
 }
 
+export interface StoryItem {
+  id: string;
+  mediaUrl: string;
+  caption?: string;
+  createdAt: string;
+  locality?: string;
+  likesCount?: number;
+}
+
+export interface UserStory {
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  locality: string;
+  hasUnseen: boolean;
+  stories: StoryItem[];
+}
+
+

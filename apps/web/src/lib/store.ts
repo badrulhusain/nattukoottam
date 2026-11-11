@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { Language, Post, User } from '../types';
+import { Language, Post, User, UserStory, StoryItem } from '../types';
 import { GUEST_USER, INITIAL_POSTS_MOCK, KERALA_LOCALITIES } from './constants';
-import { DetectedLocation } from './geolocation';
-import { removeStoredTokens } from './api';
+import { DetectedLocation, getSavedLocation, saveLocationToStorage } from './geolocation';
+import { removeStoredTokens, updateUserLocationApi } from './api';
 
 interface AppState {
   language: Language;
@@ -11,6 +11,9 @@ interface AppState {
   setLocality: (locality: string) => void;
   userLocation: DetectedLocation | null;
   setUserLocation: (loc: DetectedLocation | null) => void;
+  saveAndSetUserLocation: (loc: DetectedLocation) => void;
+  isLocationPromptOpen: boolean;
+  setIsLocationPromptOpen: (open: boolean) => void;
   currentUser: User;
   isAuthenticated: boolean;
   isAuthModalOpen: boolean;
@@ -26,13 +29,26 @@ interface AppState {
   setFeedFilter: (filter: 'forYou' | 'nearby' | 'following' | 'trending') => void;
   posts: Post[];
   setPosts: (posts: Post[]) => void;
-  addPost: (newPost: Omit<Post, 'id' | 'createdAt' | 'likesCount' | 'supportsCount' | 'commentsCount' | 'sharesCount'>) => void;
+  addPost: (newPost: Partial<Post> & Omit<Post, 'createdAt' | 'likesCount' | 'supportsCount' | 'commentsCount' | 'sharesCount'>) => void;
+  deletePost: (id: string) => void;
   toggleLike: (postId: string) => void;
   toggleSupport: (postId: string) => void;
   isOnboardingOpen: boolean;
   setIsOnboardingOpen: (open: boolean) => void;
   isCreateModalOpen: boolean;
   setIsCreateModalOpen: (open: boolean) => void;
+  // Instagram Stories State
+  stories: UserStory[];
+  setStories: (stories: UserStory[]) => void;
+  activeStoryUserIndex: number | null;
+  activeStorySlideIndex: number;
+  openStoryViewer: (userIndex: number, slideIndex?: number) => void;
+  closeStoryViewer: () => void;
+  nextStorySlide: () => void;
+  prevStorySlide: () => void;
+  isAddStoryOpen: boolean;
+  setIsAddStoryOpen: (open: boolean) => void;
+  addStory: (newStory: { mediaUrl: string; caption?: string; locality?: string }) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -41,6 +57,8 @@ export const useAppStore = create<AppState>((set) => ({
   currentLocality: 'Kakkanad',
   setLocality: (currentLocality) => set({ currentLocality }),
   userLocation: null,
+  isLocationPromptOpen: false,
+  setIsLocationPromptOpen: (isLocationPromptOpen) => set({ isLocationPromptOpen }),
   setUserLocation: (userLocation) =>
     set((state) => ({
       userLocation,
@@ -53,6 +71,24 @@ export const useAppStore = create<AppState>((set) => ({
           }
         : state.currentUser,
     })),
+  saveAndSetUserLocation: (loc) => {
+    saveLocationToStorage(loc);
+    updateUserLocationApi({
+      locality: loc.locality,
+      district: loc.district,
+    }).catch((e) => console.warn('Could not sync location to account:', e));
+
+    set((state) => ({
+      userLocation: loc,
+      currentLocality: loc.locality,
+      isLocationPromptOpen: false,
+      currentUser: {
+        ...state.currentUser,
+        locality: loc.locality,
+        district: loc.district,
+      },
+    }));
+  },
   currentUser: GUEST_USER,
   isAuthenticated: false,
   isAuthModalOpen: false,
@@ -89,12 +125,116 @@ export const useAppStore = create<AppState>((set) => ({
   isCreateModalOpen: false,
   setIsCreateModalOpen: (isCreateModalOpen) => set({ isCreateModalOpen }),
 
+  // Instagram Stories Implementation
+  stories: [],
+  setStories: (stories) => set({ stories }),
+  activeStoryUserIndex: null,
+  activeStorySlideIndex: 0,
+  openStoryViewer: (userIndex, slideIndex = 0) =>
+    set((state) => {
+      const updatedStories = state.stories.map((s, idx) =>
+        idx === userIndex ? { ...s, hasUnseen: false } : s
+      );
+      return {
+        stories: updatedStories,
+        activeStoryUserIndex: userIndex,
+        activeStorySlideIndex: slideIndex,
+      };
+    }),
+  closeStoryViewer: () => set({ activeStoryUserIndex: null, activeStorySlideIndex: 0 }),
+  nextStorySlide: () =>
+    set((state) => {
+      if (state.activeStoryUserIndex === null) return {};
+      const currentUserStory = state.stories[state.activeStoryUserIndex];
+      if (!currentUserStory) return { activeStoryUserIndex: null, activeStorySlideIndex: 0 };
+
+      if (state.activeStorySlideIndex < currentUserStory.stories.length - 1) {
+        return { activeStorySlideIndex: state.activeStorySlideIndex + 1 };
+      }
+
+      if (state.activeStoryUserIndex < state.stories.length - 1) {
+        const nextUserIndex = state.activeStoryUserIndex + 1;
+        const updatedStories = state.stories.map((s, idx) =>
+          idx === nextUserIndex ? { ...s, hasUnseen: false } : s
+        );
+        return {
+          stories: updatedStories,
+          activeStoryUserIndex: nextUserIndex,
+          activeStorySlideIndex: 0,
+        };
+      }
+
+      return { activeStoryUserIndex: null, activeStorySlideIndex: 0 };
+    }),
+  prevStorySlide: () =>
+    set((state) => {
+      if (state.activeStoryUserIndex === null) return {};
+
+      if (state.activeStorySlideIndex > 0) {
+        return { activeStorySlideIndex: state.activeStorySlideIndex - 1 };
+      }
+
+      if (state.activeStoryUserIndex > 0) {
+        const prevUserIndex = state.activeStoryUserIndex - 1;
+        const prevUserStory = state.stories[prevUserIndex];
+        return {
+          activeStoryUserIndex: prevUserIndex,
+          activeStorySlideIndex: prevUserStory ? prevUserStory.stories.length - 1 : 0,
+        };
+      }
+
+      return {};
+    }),
+  isAddStoryOpen: false,
+  setIsAddStoryOpen: (isAddStoryOpen) => set({ isAddStoryOpen }),
+  addStory: (newStory) =>
+    set((state) => {
+      const storyItem: StoryItem = {
+        id: `story_${Date.now()}`,
+        mediaUrl: newStory.mediaUrl,
+        caption: newStory.caption,
+        createdAt: 'Just now',
+        locality: newStory.locality || state.currentUser.locality || state.currentLocality,
+        likesCount: 0,
+      };
+
+      const userStoryIndex = state.stories.findIndex((s) => s.userId === state.currentUser.id);
+
+      let updatedStories: UserStory[];
+      if (userStoryIndex >= 0) {
+        updatedStories = state.stories.map((s, idx) =>
+          idx === userStoryIndex
+            ? {
+                ...s,
+                hasUnseen: true,
+                stories: [storyItem, ...s.stories],
+              }
+            : s
+        );
+      } else {
+        const newUserStory: UserStory = {
+          userId: state.currentUser.id,
+          userName: state.currentUser.fullName,
+          userAvatar: state.currentUser.avatarUrl,
+          locality: state.currentUser.locality || state.currentLocality,
+          hasUnseen: true,
+          stories: [storyItem],
+        };
+        updatedStories = [newUserStory, ...state.stories];
+      }
+
+      return {
+        stories: updatedStories,
+        isAddStoryOpen: false,
+      };
+    }),
+
   addPost: (newPostData) =>
     set((state) => ({
       posts: [
         {
           ...newPostData,
-          id: `post_${Date.now()}`,
+          id: (newPostData as any).id || `post_${Date.now()}`,
           createdAt: 'Just now',
           likesCount: 0,
           isLiked: false,
@@ -106,6 +246,11 @@ export const useAppStore = create<AppState>((set) => ({
         ...state.posts,
       ],
       isCreateModalOpen: false,
+    })),
+
+  deletePost: (id) =>
+    set((state) => ({
+      posts: state.posts.filter((post) => post.id !== id),
     })),
 
   toggleLike: (postId) =>

@@ -1,27 +1,31 @@
 'use client';
 
 import React from 'react';
-import { Home, AlertCircle, Compass, Bell, User as UserIcon, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Home, AlertCircle, Compass, User as UserIcon, Plus } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 
 interface NavItem {
   id: 'home' | 'grievances' | 'create' | 'discover' | 'profile';
+  href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   isAction?: boolean;
 }
 
 export const BottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, language, setIsCreateModalOpen } = useAppStore();
+  const pathname = usePathname();
+  const { language, setIsCreateModalOpen, isAuthenticated, setIsAuthModalOpen } = useAppStore();
   const t = getT(language);
 
   const navItems: NavItem[] = [
-    { id: 'home', label: t.nav.home, icon: Home },
-    { id: 'grievances', label: t.nav.grievances, icon: AlertCircle },
-    { id: 'create', label: '', icon: Plus, isAction: true },
-    { id: 'discover', label: t.nav.discover, icon: Compass },
-    { id: 'profile', label: t.nav.profile, icon: UserIcon },
+    { id: 'home', href: '/', label: t.nav.home, icon: Home },
+    { id: 'grievances', href: '/grievances', label: t.nav.grievances, icon: AlertCircle },
+    { id: 'create', href: '#', label: '', icon: Plus, isAction: true },
+    { id: 'discover', href: '/discover', label: t.nav.discover, icon: Compass },
+    { id: 'profile', href: '/profile', label: t.nav.profile, icon: UserIcon },
   ];
 
   return (
@@ -32,7 +36,13 @@ export const BottomNav: React.FC = () => {
             return (
               <button
                 key="create-action"
-                onClick={() => setIsCreateModalOpen(true)}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    setIsAuthModalOpen(true, 'login');
+                  } else {
+                    setIsCreateModalOpen(true);
+                  }
+                }}
                 className="relative -top-3 w-12 h-12 rounded-full bg-gradient-to-tr from-[#16A34A] to-[#22C55E] text-white flex items-center justify-center shadow-md shadow-[#16A34A]/30 active-press transition-transform focus:outline-none"
                 aria-label={t.nav.createPost}
               >
@@ -42,12 +52,12 @@ export const BottomNav: React.FC = () => {
           }
 
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = item.href === '/' ? pathname === '/' : pathname?.startsWith(item.href);
 
           return (
-            <button
+            <Link
               key={item.id}
-              onClick={() => setActiveTab(item.id as any)}
+              href={item.href}
               className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-all active-press ${
                 isActive ? 'text-[#16A34A]' : 'text-[#718078] hover:text-[#17231D]'
               }`}
@@ -66,7 +76,7 @@ export const BottomNav: React.FC = () => {
               >
                 {item.label}
               </span>
-            </button>
+            </Link>
           );
         })}
       </div>

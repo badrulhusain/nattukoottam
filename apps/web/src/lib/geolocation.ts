@@ -262,3 +262,31 @@ export function getCurrentGpsPosition(): Promise<GeolocationPosition> {
   });
 }
 
+export const LOCATION_STORAGE_KEY = 'nattukuttam_user_location';
+
+export function getSavedLocation(): DetectedLocation | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(LOCATION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLocationToStorage(loc: DetectedLocation) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(loc));
+  } catch (err) {
+    console.warn('Failed to save location to localStorage:', err);
+  }
+}
+
+export function clearSavedLocation() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(LOCATION_STORAGE_KEY);
+  } catch {}
+}
+

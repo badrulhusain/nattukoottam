@@ -156,6 +156,19 @@ export class AuthService {
     return { user: this.sanitizeUser(user), tokens };
   }
 
+  async updateLocation(userId: string, dto: { locality: string; district: string; wardNumber?: number }) {
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        locality: dto.locality,
+        district: dto.district,
+        ...(dto.wardNumber !== undefined ? { wardNumber: dto.wardNumber } : {}),
+      },
+    });
+    this.logger.log(`Updated user ${userId} saved location to ${dto.locality}, ${dto.district}`);
+    return this.sanitizeUser(updated);
+  }
+
   private async generateTokens(user: User) {
     const payload = {
       sub: user.id,

@@ -1,5 +1,6 @@
 import './global.css';
 import localFont from 'next/font/local';
+import { AppShell } from '../components/layout/AppShell';
 
 const meera = localFont({
   src: './fonts/meera-regular.ttf',
@@ -29,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="ml" className={meera.variable}>
       <body className="antialiased selection:bg-[#16A34A] selection:text-white min-h-screen bg-[#F8FAF8] text-[#17231D]">
-        {children}
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

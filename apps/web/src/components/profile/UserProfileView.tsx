@@ -32,10 +32,16 @@ export const UserProfileView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'posts' | 'grievances' | 'supported' | 'about'>('posts');
 
   const userPosts = posts.filter(
-    (p) => p.author.username === currentUser.username || p.author.id === currentUser.id
+    (p) =>
+      !p.isInfrastructureIssue &&
+      (p.author.username === currentUser.username || p.author.id === currentUser.id)
   );
   const supportedPosts = posts.filter((p) => p.isSupported);
-  const grievancePosts = posts.filter((p) => p.isInfrastructureIssue);
+  const grievancePosts = posts.filter(
+    (p) =>
+      p.isInfrastructureIssue &&
+      (p.author.username === currentUser.username || p.author.id === currentUser.id)
+  );
 
   return (
     <div className="space-y-4 pb-20">

@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   Home,
   AlertCircle,
@@ -10,8 +12,6 @@ import {
   ShieldCheck,
   Plus,
   MapPin,
-  Sparkles,
-  TrendingUp,
   LogIn,
   LogOut,
 } from 'lucide-react';
@@ -20,9 +20,8 @@ import { getT } from '../../lib/translations';
 import { UserAvatar } from '../ui/UserAvatar';
 
 export const DesktopSidebar: React.FC = () => {
+  const pathname = usePathname();
   const {
-    activeTab,
-    setActiveTab,
     language,
     currentUser,
     currentLocality,
@@ -30,17 +29,30 @@ export const DesktopSidebar: React.FC = () => {
     setIsAuthModalOpen,
     logout,
     setIsCreateModalOpen,
+    posts,
   } = useAppStore();
   const t = getT(language);
 
-  const navItems = [
-    { id: 'home', label: t.nav.home, icon: Home, badge: null },
-    { id: 'grievances', label: t.nav.grievances, icon: AlertCircle, badge: '18' },
-    { id: 'discover', label: t.nav.discover, icon: Compass, badge: null },
-    { id: 'notifications', label: t.nav.notifications, icon: Bell, badge: '3' },
-    { id: 'profile', label: t.nav.profile, icon: UserIcon, badge: null },
-    { id: 'official', label: t.nav.officialPortal, icon: ShieldCheck, badge: 'Gov' },
-  ] as const;
+  const grievancesCount = posts.filter(
+    (p) => p.isInfrastructureIssue || p.urgency
+  ).length;
+
+  type TabType = 'home' | 'grievances' | 'discover' | 'notifications' | 'profile' | 'official';
+
+  const navItems: { id: TabType; href: string; label: string; icon: any; badge: string | null }[] = [
+    { id: 'home', href: '/', label: t.nav.home, icon: Home, badge: null },
+    {
+      id: 'grievances',
+      href: '/grievances',
+      label: t.nav.grievances,
+      icon: AlertCircle,
+      badge: grievancesCount > 0 ? String(grievancesCount) : null,
+    },
+    { id: 'discover', href: '/discover', label: t.nav.discover, icon: Compass, badge: null },
+    { id: 'notifications', href: '/notifications', label: t.nav.notifications, icon: Bell, badge: null },
+    { id: 'profile', href: '/profile', label: t.nav.profile, icon: UserIcon, badge: null },
+    { id: 'official', href: '/official', label: t.nav.officialPortal, icon: ShieldCheck, badge: 'Gov' },
+  ];
 
   return (
     <aside className="hidden sm:flex flex-col w-64 h-[calc(100vh-61px)] sticky top-[61px] border-r border-[#E4EBE6] p-4 justify-between bg-white/60 backdrop-blur-xs select-none">
@@ -75,12 +87,12 @@ export const DesktopSidebar: React.FC = () => {
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = item.href === '/' ? pathname === '/' : pathname?.startsWith(item.href);
 
             return (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                href={item.href}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all active-press ${
                   isActive
                     ? 'bg-[#EAF7EF] text-[#16A34A] shadow-2xs border border-[#D1EBD9]'
@@ -109,7 +121,7 @@ export const DesktopSidebar: React.FC = () => {
                     {item.badge}
                   </span>
                 )}
-              </button>
+              </Link>
             );
           })}
         </nav>
@@ -117,7 +129,13 @@ export const DesktopSidebar: React.FC = () => {
         {/* Primary Action Button: Post & Grievance */}
         <div className="pt-2">
           <button
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => {
+              if (!isAuthenticated) {
+                setIsAuthModalOpen(true, 'login');
+              } else {
+                setIsCreateModalOpen(true);
+              }
+            }}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold text-xs shadow-md shadow-[#16A34A]/20 transition-all active-press"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -129,9 +147,9 @@ export const DesktopSidebar: React.FC = () => {
       {/* User Quick Profile / Auth Callout at Bottom */}
       {isAuthenticated ? (
         <div className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8FAF8] border border-transparent hover:border-[#E4EBE6] transition-all group">
-          <div
-            onClick={() => setActiveTab('profile')}
-            className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+          <Link
+            href="/profile"
+            className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
           >
             <div className="relative">
               <UserAvatar
@@ -150,7 +168,7 @@ export const DesktopSidebar: React.FC = () => {
                 {currentUser.role === 'DEPARTMENT_OFFICIAL' ? '🏛️ Official' : '🌿 Citizen'} · {currentUser.locality}
               </div>
             </div>
-          </div>
+          </Link>
           <button
             onClick={() => logout()}
             className="p-1.5 rounded-lg text-[#718078] hover:text-red-600 hover:bg-red-50 transition-colors"

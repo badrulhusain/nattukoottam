@@ -269,5 +269,29 @@ export class IssuesService {
 
     return updated;
   }
+
+  async remove(id: string, userId: string, role: string) {
+    const issue = await this.prisma.issue.findUnique({ where: { id } });
+    if (!issue) {
+      throw new NotFoundException({ code: 'ISSUE_NOT_FOUND', message: 'Civic issue not found' });
+    }
+
+    if (issue.reporterId !== userId && role !== 'ADMIN') {
+      throw new ForbiddenException({
+        code: 'NOT_AUTHORIZED',
+        message: 'You can only delete your own issues',
+      });
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.issueEvidence.deleteMany({ where: { issueId: id } }),
+      this.prisma.issueSupport.deleteMany({ where: { issueId: id } }),
+      this.prisma.issueFollow.deleteMany({ where: { issueId: id } }),
+      this.prisma.issueHistory.deleteMany({ where: { issueId: id } }),
+      this.prisma.issue.delete({ where: { id } }),
+    ]);
+
+    return { success: true };
+  }
 }
 

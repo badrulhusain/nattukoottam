@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   Get,
   UseGuards,
@@ -51,6 +52,17 @@ export class AuthController {
   @ApiOperation({ summary: 'Get currently authenticated user profile' })
   async getMe(@CurrentUser() user: any) {
     return user;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('location')
+  @ApiBearerAuth('bearer-jwt')
+  @ApiOperation({ summary: 'Update and save user location in account profile' })
+  async updateLocation(
+    @CurrentUser('id') userId: string,
+    @Body() dto: { locality: string; district: string; wardNumber?: number }
+  ) {
+    return this.authService.updateLocation(userId, dto);
   }
 
   @Public()

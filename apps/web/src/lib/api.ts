@@ -134,6 +134,26 @@ export async function getCurrentUserApi() {
   }
 }
 
+export async function updateUserLocationApi(locationData: { locality: string; district: string; wardNumber?: number }) {
+  const token = getStoredToken();
+  if (!token) return null;
+
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/auth/location`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(locationData),
+    });
+
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn('Failed to sync location to user account:', err);
+    return null;
+  }
+}
+
 export async function fetchLivePosts(locality?: string) {
   try {
     const apiBase = getApiBaseUrl();
@@ -259,6 +279,50 @@ export async function toggleSupportApi(issueId: string) {
   } catch {
     return false;
   }
+}
+
+export async function deletePostOrIssueApi(id: string, isIssue?: boolean): Promise<boolean> {
+  const apiBase = getApiBaseUrl();
+  const headers = getAuthHeaders();
+
+  // Try issue endpoint first if flagged as infrastructure issue
+  if (isIssue) {
+    try {
+      const res = await fetch(`${apiBase}/issues/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (res.ok) return true;
+    } catch (err) {
+      console.debug('Issue delete error:', err);
+    }
+  }
+
+  // Try post endpoint
+  try {
+    const res = await fetch(`${apiBase}/posts/${id}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (res.ok) return true;
+  } catch (err) {
+    console.debug('Post delete error:', err);
+  }
+
+  // Fallback try issue endpoint
+  if (!isIssue) {
+    try {
+      const res = await fetch(`${apiBase}/issues/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (res.ok) return true;
+    } catch (err) {
+      console.debug('Fallback issue delete error:', err);
+    }
+  }
+
+  return false;
 }
 
 export async function fetchLiveDepartments() {

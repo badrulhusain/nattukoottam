@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   MapPin,
   Search,
@@ -24,12 +26,14 @@ import { getCurrentGpsPosition, reverseGeocodeCoordinates } from '../../lib/geol
 import { UserAvatar } from '../ui/UserAvatar';
 
 export const AppHeader: React.FC = () => {
+  const pathname = usePathname();
   const {
     language,
     setLanguage,
     currentLocality,
     setLocality,
     setUserLocation,
+    saveAndSetUserLocation,
     setIsOnboardingOpen,
     setActiveTab,
     currentUser,
@@ -54,8 +58,7 @@ export const AppHeader: React.FC = () => {
         pos.coords.longitude,
         pos.coords.accuracy
       );
-      setUserLocation(detected);
-      setLocality(detected.locality);
+      saveAndSetUserLocation(detected);
       setIsLocalityDropdownOpen(false);
     } catch (err) {
       console.warn('GPS detection failed from header:', err);
@@ -81,8 +84,8 @@ export const AppHeader: React.FC = () => {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-15 flex items-center justify-between gap-2 sm:gap-6">
         {/* Brand Logo & Mobile Trigger */}
         <div className="flex items-center gap-3 flex-shrink-0">
-          <button
-            onClick={() => setIsOnboardingOpen(true)}
+          <Link
+            href="/"
             className="flex items-center gap-2.5 group text-left focus:outline-none"
             title="Naatukoottam Community Hub"
           >
@@ -115,7 +118,7 @@ export const AppHeader: React.FC = () => {
                 {t.taglineMalayalam}
               </p>
             </div>
-          </button>
+          </Link>
         </div>
 
         {/* Global Search Bar (Social Feed Search) */}
@@ -225,8 +228,7 @@ export const AppHeader: React.FC = () => {
                       <button
                         key={`${loc.name}-${loc.district}`}
                         onClick={() => {
-                          setLocality(loc.name);
-                          setUserLocation({
+                          saveAndSetUserLocation({
                             latitude: loc.lat,
                             longitude: loc.lng,
                             accuracy: 50,
@@ -287,14 +289,16 @@ export const AppHeader: React.FC = () => {
           </div>
 
           {/* Notifications Trigger */}
-          <button
-            onClick={() => setActiveTab('notifications')}
-            className="relative p-1.5 sm:p-2 rounded-xl text-[#17231D] hover:bg-[#F8FAF8] hover:text-[#16A34A] border border-transparent hover:border-[#E4EBE6] transition-all active-press"
+          <Link
+            href="/notifications"
+            className={`relative p-1.5 sm:p-2 rounded-xl text-[#17231D] hover:bg-[#F8FAF8] hover:text-[#16A34A] border border-transparent hover:border-[#E4EBE6] transition-all active-press ${
+              pathname === '/notifications' ? 'bg-[#EAF7EF] text-[#16A34A] border-[#D1EBD9]' : ''
+            }`}
             title={t.nav.notifications}
           >
             <Bell className="w-4 h-4 sm:w-5 sm:h-5 stroke-[1.9]" />
             <span className="absolute top-1 sm:top-1.5 right-1 sm:right-1.5 w-2 h-2 rounded-full bg-[#DC2626] ring-2 ring-white" />
-          </button>
+          </Link>
 
           {/* Authentication Action Pill */}
           {isAuthenticated ? (
@@ -321,27 +325,23 @@ export const AppHeader: React.FC = () => {
                     <div className="text-xs font-bold text-[#17231D] truncate">{currentUser.fullName}</div>
                     <div className="text-[10px] text-[#718078]">{currentUser.role === 'DEPARTMENT_OFFICIAL' ? '🏛️ Official' : '🌿 Citizen'} · {currentUser.locality}</div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setActiveTab('profile');
-                      setIsUserMenuOpen(false);
-                    }}
+                  <Link
+                    href="/profile"
+                    onClick={() => setIsUserMenuOpen(false)}
                     className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-[#17231D] hover:bg-[#F8FAF8] flex items-center gap-2"
                   >
                     <UserIcon className="w-3.5 h-3.5 text-[#16A34A]" />
                     <span>{t.nav.profile}</span>
-                  </button>
+                  </Link>
                   {currentUser.role === 'DEPARTMENT_OFFICIAL' && (
-                    <button
-                      onClick={() => {
-                        setActiveTab('official');
-                        setIsUserMenuOpen(false);
-                      }}
+                    <Link
+                      href="/official"
+                      onClick={() => setIsUserMenuOpen(false)}
                       className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-[#17231D] hover:bg-[#F8FAF8] flex items-center gap-2"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-[#16A34A]" />
                       <span>{t.nav.officialPortal}</span>
-                    </button>
+                    </Link>
                   )}
                   <button
                     onClick={() => {

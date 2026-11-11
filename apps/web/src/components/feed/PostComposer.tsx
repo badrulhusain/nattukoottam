@@ -7,12 +7,27 @@ import { getT } from '../../lib/translations';
 import { UserAvatar } from '../ui/UserAvatar';
 
 export const PostComposer: React.FC = () => {
-  const { currentUser, currentLocality, language, setIsCreateModalOpen } = useAppStore();
+  const {
+    currentUser,
+    currentLocality,
+    language,
+    setIsCreateModalOpen,
+    isAuthenticated,
+    setIsAuthModalOpen,
+  } = useAppStore();
   const t = getT(language);
+
+  const handleClick = () => {
+    if (!isAuthenticated) {
+      setIsAuthModalOpen(true, 'login');
+    } else {
+      setIsCreateModalOpen(true);
+    }
+  };
 
   return (
     <div
-      onClick={() => setIsCreateModalOpen(true)}
+      onClick={handleClick}
       className="bg-white rounded-2xl p-4 border border-[#E4EBE6] shadow-2xs hover:border-[#D0DBD3] transition-all cursor-pointer group"
     >
       <div className="flex items-center gap-3">

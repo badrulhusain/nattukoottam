@@ -15,7 +15,14 @@ import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 
 export const DiscoverMapView: React.FC = () => {
-  const { language, posts, userLocation, toggleSupport } = useAppStore();
+  const {
+    language,
+    posts,
+    userLocation,
+    toggleSupport,
+    isAuthenticated,
+    setIsAuthModalOpen,
+  } = useAppStore();
   const t = getT(language);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
 
@@ -147,7 +154,13 @@ export const DiscoverMapView: React.FC = () => {
 
           <div className="flex items-center justify-between pt-3 border-t border-[#E4EBE6] text-xs">
             <button
-              onClick={() => toggleSupport(selectedPost.id)}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  setIsAuthModalOpen(true, 'login');
+                } else {
+                  toggleSupport(selectedPost.id);
+                }
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all active-press ${
                 selectedPost.isSupported
                   ? 'bg-[#16A34A] text-white'

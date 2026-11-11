@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle,
   ArrowRight,
@@ -93,13 +94,13 @@ export const RightSidebar: React.FC = () => {
             <span className="text-[10px] text-amber-800 font-semibold">
               {currentLocality}
             </span>
-            <button
-              onClick={() => setActiveTab('official')}
+            <Link
+              href="/official"
               className="flex items-center gap-1 text-xs text-[#16A34A] font-bold hover:text-[#15803D] transition-colors"
             >
               <span>{language === 'ml' ? 'ഏകോപനം കാണുക' : 'View Action'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            </Link>
           </div>
         </div>
       ) : (

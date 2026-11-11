@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -64,6 +65,18 @@ export class IssuesController {
     @Body() dto: UpdateIssueStatusDto
   ) {
     return this.issuesService.updateStatus(id, actorId, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer-jwt')
+  @ApiOperation({ summary: 'Delete a civic issue (reporter or admin only)' })
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string
+  ) {
+    return this.issuesService.remove(id, userId, role);
   }
 }
 
