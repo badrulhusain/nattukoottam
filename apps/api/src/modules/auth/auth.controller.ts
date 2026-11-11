@@ -65,6 +65,27 @@ export class AuthController {
     return this.authService.updateLocation(userId, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  @ApiBearerAuth('bearer-jwt')
+  @ApiOperation({ summary: 'Update user profile info' })
+  async updateProfile(
+    @CurrentUser('id') userId: string,
+    @Body()
+    dto: {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      avatarUrl?: string;
+      locality?: string;
+      district?: string;
+      wardNumber?: number;
+      preferredLang?: string;
+    }
+  ) {
+    return this.authService.updateProfile(userId, dto);
+  }
+
   @Public()
   @Post('clerk-sync')
   @ApiOperation({ summary: 'Synchronize a user authenticated via Clerk with Neon database' })

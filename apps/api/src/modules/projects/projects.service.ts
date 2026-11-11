@@ -232,5 +232,25 @@ export class ProjectsService {
       },
     });
   }
+
+  async updateStatus(id: string, status: any) {
+    const project = await this.prisma.infrastructureProject.findUnique({
+      where: { id },
+    });
+    if (!project) {
+      throw new NotFoundException({ code: 'PROJECT_NOT_FOUND', message: 'Infrastructure project not found' });
+    }
+
+    return this.prisma.infrastructureProject.update({
+      where: { id },
+      data: {
+        status,
+        ...(status === 'COMPLETED' ? { actualEndDate: new Date() } : {}),
+      },
+      include: {
+        department: true,
+      },
+    });
+  }
 }
 

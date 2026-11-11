@@ -283,7 +283,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       </div>
 
       {/* Post Text Body */}
-      <p className="text-[14px] text-[#17231D] leading-relaxed whitespace-pre-line font-normal">
+      <p className="text-[15.5px] text-[#17231D] leading-relaxed whitespace-pre-line font-normal">
         {post.content}
       </p>
 

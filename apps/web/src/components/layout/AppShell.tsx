@@ -35,6 +35,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       setActiveTab('home');
     } else if (pathname.startsWith('/grievances')) {
       setActiveTab('grievances');
+    } else if (pathname.startsWith('/discussions')) {
+      setActiveTab('discussions');
     } else if (pathname.startsWith('/discover')) {
       setActiveTab('discover');
     } else if (pathname.startsWith('/notifications')) {
@@ -171,6 +173,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           sharesCount: 0,
           createdAt: issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : 'Just now',
           isInfrastructureIssue: true,
+          status: issue.status || 'UNDER_REVIEW',
         }));
 
         const allItems = [...mappedIssues, ...mappedPosts];

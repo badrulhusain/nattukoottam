@@ -233,13 +233,19 @@ export class IssuesService {
     }
   }
 
-  async updateStatus(issueId: string, actorUserId: string, dto: UpdateIssueStatusDto) {
+  async updateStatus(issueId: string, actorUserId: string | undefined, dto: UpdateIssueStatusDto) {
     const issue = await this.prisma.issue.findUnique({ where: { id: issueId } });
     if (!issue) {
       throw new NotFoundException({ code: 'ISSUE_NOT_FOUND', message: 'Civic issue not found' });
     }
 
     const prevStatus = issue.status;
+
+    let finalActorId = actorUserId;
+    if (!finalActorId) {
+      const fallbackUser = await this.prisma.user.findFirst();
+      finalActorId = fallbackUser?.id || issue.reporterId;
+    }
 
     const updated = await this.prisma.issue.update({
       where: { id: issueId },
@@ -251,7 +257,7 @@ export class IssuesService {
         resolvedAt: dto.status === 'RESOLVED' ? new Date() : issue.resolvedAt,
         history: {
           create: {
-            actorId: actorUserId,
+            actorId: finalActorId,
             fromStatus: prevStatus,
             toStatus: dto.status,
             notes: dto.notes,

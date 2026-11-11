@@ -71,6 +71,7 @@ export interface Post {
   sharesCount: number;
   createdAt: string;
   isInfrastructureIssue?: boolean;
+  status?: IssueStatus;
 }
 
 export interface InfrastructureIssue {
@@ -162,5 +163,63 @@ export interface UserStory {
   hasUnseen: boolean;
   stories: StoryItem[];
 }
+
+export type DiscussionRoomType = 'CHANNEL' | 'GROUP' | 'DIRECT';
+
+export interface DiscussionRoom {
+  id: string;
+  name: string;
+  description?: string;
+  type: DiscussionRoomType;
+  locality?: string;
+  district?: string;
+  category?: string;
+  avatarUrl?: string;
+  membersCount: number;
+  messagesCount: number;
+  isMember: boolean;
+  canJoinDirectly: boolean;
+  requiresInvite?: boolean;
+  latestMessage?: {
+    id: string;
+    content: string;
+    createdAt: string;
+    sender?: { fullName: string; avatarUrl?: string };
+  };
+  createdBy?: { id: string; fullName: string; avatarUrl?: string };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiscussionMember {
+  id: string;
+  userId: string;
+  role: 'ADMIN' | 'MEMBER';
+  joinedAt: string;
+  user: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+    locality?: string;
+    role?: string;
+  };
+}
+
+export interface DiscussionMessage {
+  id: string;
+  roomId: string;
+  senderId: string;
+  content: string;
+  mediaUrl?: string;
+  createdAt: string;
+  sender: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+    locality?: string;
+    role?: string;
+  };
+}
+
 
 

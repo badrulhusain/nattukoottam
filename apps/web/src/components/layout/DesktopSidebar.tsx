@@ -14,6 +14,7 @@ import {
   MapPin,
   LogIn,
   LogOut,
+  MessagesSquare,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
@@ -37,7 +38,7 @@ export const DesktopSidebar: React.FC = () => {
     (p) => p.isInfrastructureIssue || p.urgency
   ).length;
 
-  type TabType = 'home' | 'grievances' | 'discover' | 'notifications' | 'profile' | 'official';
+  type TabType = 'home' | 'grievances' | 'discussions' | 'discover' | 'notifications' | 'profile' | 'official';
 
   const navItems: { id: TabType; href: string; label: string; icon: any; badge: string | null }[] = [
     { id: 'home', href: '/', label: t.nav.home, icon: Home, badge: null },
@@ -47,6 +48,13 @@ export const DesktopSidebar: React.FC = () => {
       label: t.nav.grievances,
       icon: AlertCircle,
       badge: grievancesCount > 0 ? String(grievancesCount) : null,
+    },
+    {
+      id: 'discussions',
+      href: '/discussions',
+      label: language === 'ml' ? 'ചർച്ചകൾ' : 'Discussions',
+      icon: MessagesSquare,
+      badge: null,
     },
     { id: 'discover', href: '/discover', label: t.nav.discover, icon: Compass, badge: null },
     { id: 'notifications', href: '/notifications', label: t.nav.notifications, icon: Bell, badge: null },

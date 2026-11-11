@@ -18,6 +18,7 @@ import {
   LogIn,
 } from 'lucide-react';
 import { UserAvatar } from '../ui/UserAvatar';
+import { EditProfileModal } from './EditProfileModal';
 
 export const UserProfileView: React.FC = () => {
   const {
@@ -30,6 +31,7 @@ export const UserProfileView: React.FC = () => {
   } = useAppStore();
   const t = getT(language);
   const [activeTab, setActiveTab] = useState<'posts' | 'grievances' | 'supported' | 'about'>('posts');
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
   const userPosts = posts.filter(
     (p) =>
@@ -79,7 +81,16 @@ export const UserProfileView: React.FC = () => {
 
             {/* Actions: Edit Profile, Share & Auth */}
             <div className="flex items-center gap-2 pt-1 sm:pt-0">
-              <button className="py-2 px-3.5 rounded-xl bg-[#EAF7EF] hover:bg-[#d8f2de] text-[#16A34A] font-bold text-xs transition-colors flex items-center gap-1.5 border border-[#D1EBD9] active-press">
+              <button
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    setIsAuthModalOpen(true, 'login');
+                  } else {
+                    setIsEditProfileOpen(true);
+                  }
+                }}
+                className="py-2 px-3.5 rounded-xl bg-[#EAF7EF] hover:bg-[#d8f2de] text-[#16A34A] font-bold text-xs transition-colors flex items-center gap-1.5 border border-[#D1EBD9] active-press cursor-pointer"
+              >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>{t.profile.editProfile}</span>
               </button>
@@ -270,6 +281,12 @@ export const UserProfileView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
+      />
     </div>
   );
 };

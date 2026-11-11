@@ -85,6 +85,12 @@ enum NotificationType {
   COORDINATION_REQUEST
 }
 
+enum DiscussionRoomType {
+  CHANNEL
+  GROUP
+  DIRECT
+}
+
 // ----------------------------------------------------
 // USER & AUTHENTICATION
 // ----------------------------------------------------
@@ -122,6 +128,10 @@ model User {
 
   following        Follow[]     @relation("Follower")
   followers        Follow[]     @relation("Following")
+
+  createdRooms          DiscussionRoom[]   @relation("CreatedRooms")
+  discussionMemberships DiscussionMember[]
+  discussionMessages    DiscussionMessage[]
 
   @@index([phone])
   @@index([district, locality])
@@ -420,5 +430,61 @@ model AuditLog {
 
   @@index([action])
   @@index([createdAt(sort: Desc)])
+}
+
+// ----------------------------------------------------
+// COMMUNITY DISCUSSION GROUPS & CHANNELS
+// ----------------------------------------------------
+
+model DiscussionRoom {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  type        DiscussionRoomType  @default(CHANNEL) // CHANNEL = Public, anyone can join | GROUP = Private, members add members | DIRECT = 1-on-1
+  locality    String?             // e.g. Kakkanad, Mudikkode, or "Kerala"
+  district    String?             // e.g. Ernakulam, Thrissur
+  category    String?             // e.g. "Civic Issues", "Waste Management", "Roads", "General"
+  createdById String
+  avatarUrl   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  createdBy   User                @relation("CreatedRooms", fields: [createdById], references: [id], onDelete: Cascade)
+  members     DiscussionMember[]
+  messages    DiscussionMessage[]
+
+  @@index([type])
+  @@index([district, locality])
+  @@index([createdAt(sort: Desc)])
+}
+
+model DiscussionMember {
+  id        String         @id @default(uuid())
+  roomId    String
+  userId    String
+  role      String         @default("MEMBER") // "ADMIN" | "MEMBER"
+  addedById String?        // Who added this member (used for private groups)
+  joinedAt  DateTime       @default(now())
+
+  room      DiscussionRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId])
+  @@index([roomId])
+}
+
+model DiscussionMessage {
+  id        String         @id @default(uuid())
+  roomId    String
+  senderId  String
+  content   String
+  mediaUrl  String?
+  createdAt DateTime       @default(now())
+
+  room      DiscussionRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender    User           @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt(sort: Asc)])
 }
 

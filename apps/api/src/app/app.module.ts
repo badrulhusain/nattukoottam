@@ -10,6 +10,7 @@ import { PostsModule } from '../modules/posts/posts.module';
 import { IssuesModule } from '../modules/issues/issues.module';
 import { ProjectsModule } from '../modules/projects/projects.module';
 import { DepartmentsModule } from '../modules/departments/departments.module';
+import { DiscussionsModule } from '../modules/discussions/discussions.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -29,6 +30,7 @@ import { AppService } from './app.service';
     IssuesModule,
     ProjectsModule,
     DepartmentsModule,
+    DiscussionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

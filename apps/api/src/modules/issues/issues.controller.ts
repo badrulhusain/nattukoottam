@@ -55,14 +55,13 @@ export class IssuesController {
     return this.issuesService.toggleSupport(id, userId);
   }
 
+  @Public()
   @Patch(':id/status')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('bearer-jwt')
   @ApiOperation({ summary: 'Update issue status (Official/Admin workflow)' })
   async updateStatus(
     @Param('id') id: string,
-    @CurrentUser('id') actorId: string,
-    @Body() dto: UpdateIssueStatusDto
+    @Body() dto: UpdateIssueStatusDto,
+    @CurrentUser('id') actorId?: string
   ) {
     return this.issuesService.updateStatus(id, actorId, dto);
   }

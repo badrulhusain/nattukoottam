@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Plus, Camera, Sparkles } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { UserAvatar } from '../ui/UserAvatar';
@@ -9,6 +9,7 @@ import { UserStory } from '../../types';
 export const StoriesBar: React.FC = () => {
   const {
     stories,
+    setStories,
     openStoryViewer,
     setIsAddStoryOpen,
     currentUser,
@@ -62,6 +63,13 @@ export const StoriesBar: React.FC = () => {
     return combined;
   }, [stories, posts]);
 
+  // Synchronize display stories with global store whenever displayStories change
+  useEffect(() => {
+    if (displayStories.length > 0 && stories.length === 0) {
+      setStories(displayStories);
+    }
+  }, [displayStories, stories.length, setStories]);
+
   // Find if current user has an active story
   const myStoryIndex = displayStories.findIndex((s) => s.userId === currentUser.id);
   const myStory = myStoryIndex >= 0 ? displayStories[myStoryIndex] : null;
@@ -101,7 +109,7 @@ export const StoriesBar: React.FC = () => {
             <button
               onClick={() => {
                 if (myStory && myStoryIndex >= 0) {
-                  openStoryViewer(myStoryIndex);
+                  openStoryViewer(myStoryIndex, 0, displayStories);
                 } else if (!isAuthenticated) {
                   setIsAuthModalOpen(true, 'login');
                 } else {
@@ -163,7 +171,7 @@ export const StoriesBar: React.FC = () => {
             return (
               <button
                 key={story.userId}
-                onClick={() => openStoryViewer(actualIndex)}
+                onClick={() => openStoryViewer(actualIndex, 0, displayStories)}
                 className="flex flex-col items-center flex-shrink-0 group focus:outline-none transition-transform"
                 title={`View ${story.userName}'s story`}
               >

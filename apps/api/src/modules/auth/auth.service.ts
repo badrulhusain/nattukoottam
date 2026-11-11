@@ -169,6 +169,36 @@ export class AuthService {
     return this.sanitizeUser(updated);
   }
 
+  async updateProfile(
+    userId: string,
+    dto: {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      avatarUrl?: string;
+      locality?: string;
+      district?: string;
+      wardNumber?: number;
+      preferredLang?: string;
+    }
+  ) {
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.fullName ? { fullName: dto.fullName } : {}),
+        ...(dto.email !== undefined ? { email: dto.email || null } : {}),
+        ...(dto.phone ? { phone: dto.phone } : {}),
+        ...(dto.avatarUrl !== undefined ? { avatarUrl: dto.avatarUrl } : {}),
+        ...(dto.locality ? { locality: dto.locality } : {}),
+        ...(dto.district ? { district: dto.district } : {}),
+        ...(dto.wardNumber !== undefined ? { wardNumber: dto.wardNumber } : {}),
+        ...(dto.preferredLang ? { preferredLang: dto.preferredLang } : {}),
+      },
+    });
+    this.logger.log(`Updated profile for user ${userId} (${updated.fullName})`);
+    return this.sanitizeUser(updated);
+  }
+
   private async generateTokens(user: User) {
     const payload = {
       sub: user.id,

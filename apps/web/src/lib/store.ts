@@ -21,8 +21,8 @@ interface AppState {
   setIsAuthModalOpen: (open: boolean, mode?: 'login' | 'register' | 'forgot_password') => void;
   login: (user: User) => void;
   logout: () => void;
-  activeTab: 'home' | 'grievances' | 'discover' | 'notifications' | 'profile' | 'official';
-  setActiveTab: (tab: 'home' | 'grievances' | 'discover' | 'notifications' | 'profile' | 'official') => void;
+  activeTab: 'home' | 'grievances' | 'discussions' | 'discover' | 'notifications' | 'profile' | 'official';
+  setActiveTab: (tab: 'home' | 'grievances' | 'discussions' | 'discover' | 'notifications' | 'profile' | 'official') => void;
   activeCategory: string;
   setActiveCategory: (cat: string) => void;
   feedFilter: 'forYou' | 'nearby' | 'following' | 'trending';
@@ -42,7 +42,7 @@ interface AppState {
   setStories: (stories: UserStory[]) => void;
   activeStoryUserIndex: number | null;
   activeStorySlideIndex: number;
-  openStoryViewer: (userIndex: number, slideIndex?: number) => void;
+  openStoryViewer: (userIndex: number, slideIndex?: number, customStories?: UserStory[]) => void;
   closeStoryViewer: () => void;
   nextStorySlide: () => void;
   prevStorySlide: () => void;
@@ -130,9 +130,11 @@ export const useAppStore = create<AppState>((set) => ({
   setStories: (stories) => set({ stories }),
   activeStoryUserIndex: null,
   activeStorySlideIndex: 0,
-  openStoryViewer: (userIndex, slideIndex = 0) =>
+  openStoryViewer: (userIndex, slideIndex = 0, customStories) =>
     set((state) => {
-      const updatedStories = state.stories.map((s, idx) =>
+      const baseStories =
+        customStories && customStories.length > 0 ? customStories : state.stories;
+      const updatedStories = baseStories.map((s, idx) =>
         idx === userIndex ? { ...s, hasUnseen: false } : s
       );
       return {

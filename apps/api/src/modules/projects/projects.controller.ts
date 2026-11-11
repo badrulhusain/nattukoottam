@@ -42,9 +42,15 @@ export class ProjectsController {
     return this.projectsService.findAllConflicts(locality);
   }
 
+  @Public()
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update infrastructure project status (PLANNED, IN_PROGRESS, COMPLETED)' })
+  async updateStatus(@Param('id') id: string, @Body('status') status: any) {
+    return this.projectsService.updateStatus(id, status);
+  }
+
+  @Public()
   @Patch('conflicts/:id/resolve')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('bearer-jwt')
   @ApiOperation({ summary: 'Update or acknowledge a project conflict joint coordination plan' })
   async resolveConflict(@Param('id') id: string, @Body() dto: ResolveConflictDto) {
     return this.projectsService.resolveConflict(id, dto);

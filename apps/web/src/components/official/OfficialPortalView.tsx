@@ -13,24 +13,52 @@ import {
   FileText,
   ArrowRight,
   Sparkles,
+  Loader2,
+  Check,
+  RefreshCw,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
-import { fetchLiveConflicts } from '../../lib/api';
+import {
+  fetchLiveConflicts,
+  fetchLiveProjects,
+  updateProjectStatusApi,
+  resolveConflictApi,
+  updateIssueStatusApi,
+} from '../../lib/api';
 import { IssueStatus } from '../../types';
 
 export const OfficialPortalView: React.FC = () => {
-  const { language, posts, currentLocality } = useAppStore();
+  const { language, posts, setPosts, currentLocality } = useAppStore();
   const t = getT(language);
-  const [selectedStatus, setSelectedStatus] = useState<Record<string, IssueStatus>>({});
-  const [conflictResolved, setConflictResolved] = useState(false);
-  const [conflict, setConflict] = useState<any>(null);
 
-  useEffect(() => {
-    async function loadConflicts() {
-      const data = await fetchLiveConflicts(currentLocality);
-      if (data && Array.isArray(data) && data.length > 0) {
-        const first = data[0];
+  const [conflict, setConflict] = useState<any>(null);
+  const [conflictResolved, setConflictResolved] = useState(false);
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [updatingProjectId, setUpdatingProjectId] = useState<string | null>(null);
+
+  const [updatingIssueId, setUpdatingIssueId] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setSuccessToast(msg);
+    setTimeout(() => setSuccessToast(null), 3000);
+  };
+
+  // Load Conflicts and Projects from backend DB
+  const loadData = async () => {
+    try {
+      setLoadingProjects(true);
+      const [conflictsData, projectsData] = await Promise.all([
+        fetchLiveConflicts(currentLocality),
+        fetchLiveProjects(currentLocality),
+      ]);
+
+      if (conflictsData && Array.isArray(conflictsData) && conflictsData.length > 0) {
+        const first = conflictsData[0];
         setConflict({
           id: first.id,
           title: `${first.projectA?.department?.name || 'PWD'} vs. ${first.projectB?.department?.name || 'KWA'} Overlap`,
@@ -48,30 +76,127 @@ export const OfficialPortalView: React.FC = () => {
             first.jointPlan || first.notes || 'Postpone road resurfacing until underground pipeline excavation completes.',
           status: first.status,
         });
+        setConflictResolved(first.status === 'RESOLVED');
       } else {
         setConflict(null);
       }
+
+      setProjects(Array.isArray(projectsData) ? projectsData : []);
+    } catch (err) {
+      console.error('Error loading official portal data:', err);
+    } finally {
+      setLoadingProjects(false);
     }
-    loadConflicts();
+  };
+
+  useEffect(() => {
+    loadData();
   }, [currentLocality]);
 
   const issues = posts.filter((p) => p.isInfrastructureIssue);
 
-  const handleStatusChange = (postId: string, newStatus: IssueStatus) => {
-    setSelectedStatus((prev) => ({ ...prev, [postId]: newStatus }));
+  // Handle Civic Grievance Status Change in Database
+  const handleIssueStatusChange = async (issueId: string, newStatus: IssueStatus) => {
+    setUpdatingIssueId(issueId);
+    try {
+      await updateIssueStatusApi(issueId, newStatus);
+
+      // Update store state immediately
+      setPosts(
+        posts.map((p) => (p.id === issueId ? { ...p, status: newStatus } : p))
+      );
+
+      showToast(
+        language === 'ml'
+          ? 'പരാതിയുടെ അവസ്ഥ വിജയകരമായി പുതുക്കി (DB Saved)'
+          : 'Grievance status updated and saved to DB'
+      );
+    } catch (err: any) {
+      console.error('Failed to update issue status:', err);
+      alert(err.message || 'Failed to update grievance status in database');
+    } finally {
+      setUpdatingIssueId(null);
+    }
+  };
+
+  // Handle Infrastructure Project Status Change in Database
+  const handleProjectStatusChange = async (projectId: string, newStatus: string) => {
+    setUpdatingProjectId(projectId);
+    try {
+      await updateProjectStatusApi(projectId, newStatus);
+
+      setProjects((prev) =>
+        prev.map((proj) =>
+          proj.id === projectId ? { ...proj, status: newStatus } : proj
+        )
+      );
+
+      showToast(
+        language === 'ml'
+          ? 'പദ്ധതിയുടെ അവസ്ഥ പുതുക്കി (DB Saved)'
+          : 'Project status updated and saved to DB'
+      );
+    } catch (err: any) {
+      console.error('Failed to update project status:', err);
+      alert(err.message || 'Failed to update project status');
+    } finally {
+      setUpdatingProjectId(null);
+    }
+  };
+
+  // Handle Conflict Resolution Toggle in Database
+  const handleToggleConflictResolution = async () => {
+    if (!conflict) return;
+    setIsResolvingConflict(true);
+    const nextStatus = conflictResolved ? 'POTENTIAL' : 'RESOLVED';
+    try {
+      await resolveConflictApi(
+        conflict.id,
+        nextStatus,
+        'Joint schedule synchronized: PWD resurfacing coordinated with KWA pipeline laying.'
+      );
+      setConflictResolved(!conflictResolved);
+      showToast(
+        nextStatus === 'RESOLVED'
+          ? (language === 'ml' ? 'സമയക്രമം സമന്വയിപ്പിച്ചു (Saved)' : 'Schedules synchronized and saved')
+          : (language === 'ml' ? 'വൈരുദ്ധ്യം വീണ്ടും തുറന്നു' : 'Conflict re-opened')
+      );
+    } catch (err: any) {
+      console.error('Failed to resolve conflict:', err);
+      alert(err.message || 'Failed to update coordination status');
+    } finally {
+      setIsResolvingConflict(false);
+    }
   };
 
   return (
     <div className="space-y-4 pb-20">
+      {/* Toast Notification */}
+      {successToast && (
+        <div className="fixed top-16 right-4 z-50 bg-[#14532D] text-white px-4 py-2.5 rounded-xl shadow-lg border border-[#22C55E]/40 text-xs font-bold flex items-center gap-2 animate-in slide-in-from-top-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{successToast}</span>
+        </div>
+      )}
+
       {/* Official Government Coordination Banner */}
       <div className="bg-gradient-to-br from-[#14532D] via-[#16A34A] to-[#15803D] rounded-2xl p-5 text-white shadow-md">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="p-1.5 bg-white/20 rounded-lg backdrop-blur-md">
-            <ShieldCheck className="w-5 h-5 text-white" />
-          </span>
-          <span className="text-[11px] uppercase tracking-wider font-bold text-emerald-200">
-            Government of Kerala · LSGD & Interdepartmental Coordination
-          </span>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 bg-white/20 rounded-lg backdrop-blur-md">
+              <ShieldCheck className="w-5 h-5 text-white" />
+            </span>
+            <span className="text-[11px] uppercase tracking-wider font-bold text-emerald-200">
+              Government of Kerala · LSGD & Interdepartmental Coordination
+            </span>
+          </div>
+          <button
+            onClick={loadData}
+            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white active-press"
+            title="Refresh portal"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingProjects ? 'animate-spin' : ''}`} />
+          </button>
         </div>
         <h2 className="text-lg font-bold">{t.official.title}</h2>
         <p className="text-xs text-emerald-100 opacity-90 mt-1 max-w-lg">
@@ -116,7 +241,9 @@ export const OfficialPortalView: React.FC = () => {
               <div className="text-xs font-semibold text-[#17231D]">{conflict.projectA?.name}</div>
               <div className="flex items-center gap-1 text-[11px] text-[#718078]">
                 <Calendar className="w-3.5 h-3.5 text-[#16A34A]" />
-                <span>Planned: {conflict.projectA?.startDate} to {conflict.projectA?.endDate}</span>
+                <span>
+                  Planned: {conflict.projectA?.startDate ? new Date(conflict.projectA.startDate).toLocaleDateString() : 'TBD'} to {conflict.projectA?.expectedEndDate ? new Date(conflict.projectA.expectedEndDate).toLocaleDateString() : 'TBD'}
+                </span>
               </div>
             </div>
 
@@ -129,7 +256,9 @@ export const OfficialPortalView: React.FC = () => {
               <div className="text-xs font-semibold text-[#17231D]">{conflict.projectB?.name}</div>
               <div className="flex items-center gap-1 text-[11px] text-[#718078]">
                 <Calendar className="w-3.5 h-3.5 text-blue-700" />
-                <span>Planned: {conflict.projectB?.startDate} to {conflict.projectB?.endDate}</span>
+                <span>
+                  Planned: {conflict.projectB?.startDate ? new Date(conflict.projectB.startDate).toLocaleDateString() : 'TBD'} to {conflict.projectB?.expectedEndDate ? new Date(conflict.projectB.expectedEndDate).toLocaleDateString() : 'TBD'}
+                </span>
               </div>
             </div>
           </div>
@@ -143,17 +272,22 @@ export const OfficialPortalView: React.FC = () => {
           {/* Action Button */}
           <div className="pt-1 flex justify-end">
             <button
-              onClick={() => setConflictResolved(!conflictResolved)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active-press flex items-center gap-2 ${
+              onClick={handleToggleConflictResolution}
+              disabled={isResolvingConflict}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active-press flex items-center gap-2 cursor-pointer ${
                 conflictResolved
-                  ? 'bg-white border border-[#E4EBE6] text-[#718078]'
+                  ? 'bg-white border border-[#E4EBE6] text-[#718078] hover:bg-zinc-50'
                   : 'bg-[#16A34A] hover:bg-[#15803D] text-white shadow-xs'
               }`}
             >
-              <CheckCircle2 className="w-4 h-4" />
+              {isResolvingConflict ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
               <span>
                 {conflictResolved
-                  ? 'Re-open Coordination'
+                  ? (language === 'ml' ? 'സമന്വയം പുനഃപരിശോധിക്കുക' : 'Re-open Coordination')
                   : language === 'ml'
                   ? 'സമയക്രമം സമന്വയിപ്പിച്ചു അംഗീകരിക്കുക'
                   : 'Acknowledge & Sync Schedules'}
@@ -179,16 +313,110 @@ export const OfficialPortalView: React.FC = () => {
         </div>
       )}
 
+      {/* Infrastructure Projects Status Management */}
+      {projects.length > 0 && (
+        <div className="bg-white rounded-2xl p-5 border border-[#E4EBE6] shadow-2xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-[#EAF7EF] text-[#16A34A]">
+                <Building2 className="w-4 h-4" />
+              </span>
+              <div>
+                <h3 className="font-bold text-sm text-[#17231D]">
+                  {language === 'ml' ? 'വകുപ്പ് അടിസ്ഥാനസൗകര്യ പദ്ധതികൾ' : 'Department Infrastructure Projects'}
+                </h3>
+                <p className="text-[11px] text-[#718078]">
+                  {language === 'ml' ? 'പദ്ധതികളുടെ നിർമ്മാണ പുരോഗതി രേഖപ്പെടുത്തുക' : 'Update live project execution status'}
+                </p>
+              </div>
+            </div>
+
+            <span className="text-xs font-bold text-[#16A34A] bg-[#EAF7EF] px-2.5 py-1 rounded-md">
+              {projects.length} {language === 'ml' ? 'പദ്ധതികൾ' : 'Projects'}
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {projects.map((proj) => {
+              const isUpdating = updatingProjectId === proj.id;
+              return (
+                <div
+                  key={proj.id}
+                  className="p-3.5 bg-[#F8FAF8] rounded-xl border border-[#E4EBE6] space-y-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-[#16A34A] uppercase bg-[#EAF7EF] px-2 py-0.5 rounded-md">
+                        {proj.department?.name || 'Department Project'}
+                      </span>
+                      <h4 className="text-xs font-bold text-[#17231D]">{proj.name}</h4>
+                      <p className="text-[11px] text-[#718078] line-clamp-2">{proj.description}</p>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
+                        proj.status === 'COMPLETED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : proj.status === 'IN_PROGRESS'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {proj.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-[#E4EBE6] text-xs">
+                    <div className="text-[11px] text-[#718078] flex items-center gap-1.5">
+                      <MapPin className="w-3 h-3 text-[#16A34A]" />
+                      <span>{proj.locality}, {proj.district}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isUpdating && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#16A34A]" />}
+                      <select
+                        value={proj.status}
+                        disabled={isUpdating}
+                        onChange={(e) => handleProjectStatusChange(proj.id, e.target.value)}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-[#E4EBE6] text-xs font-bold text-[#17231D] outline-none cursor-pointer hover:border-[#16A34A] transition-colors"
+                      >
+                        <option value="PLANNED">Planned</option>
+                        <option value="APPROVED">Approved</option>
+                        <option value="IN_PROGRESS">In Progress</option>
+                        <option value="ON_HOLD">On Hold</option>
+                        <option value="COMPLETED">Completed</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Verified Citizen Grievances Queue */}
       <div className="bg-white rounded-2xl p-5 border border-[#E4EBE6] shadow-2xs space-y-4">
-        <h3 className="font-bold text-sm text-[#17231D]">
-          {language === 'ml' ? 'വാർഡിലെ പരിഹാര ഘട്ടങ്ങൾ' : 'Department Resolution Pipeline'}
-        </h3>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-sm text-[#17231D]">
+              {language === 'ml' ? 'വാർഡിലെ പരിഹാര ഘട്ടങ്ങൾ' : 'Department Resolution Pipeline'}
+            </h3>
+            <p className="text-[11px] text-[#718078]">
+              {language === 'ml' ? 'പൗരന്മാരുടെ പരാതികളുടെ നിലവിലുള്ള പുരോഗതി മാറ്റുക' : 'Update civic complaint progress'}
+            </p>
+          </div>
+          <span className="text-xs font-bold text-[#16A34A] bg-[#EAF7EF] px-2.5 py-1 rounded-md">
+            {issues.length} {language === 'ml' ? 'പരാതികൾ' : 'Grievances'}
+          </span>
+        </div>
 
         <div className="space-y-3">
           {issues.length > 0 ? (
             issues.map((issue) => {
-              const currentStatus = selectedStatus[issue.id] || 'IN_PROGRESS';
+              const currentStatus = (issue as any).status || 'UNDER_REVIEW';
+              const isUpdating = updatingIssueId === issue.id;
+
               return (
                 <div
                   key={issue.id}
@@ -203,8 +431,16 @@ export const OfficialPortalView: React.FC = () => {
                       <p className="text-xs text-[#17231D] mt-1 line-clamp-2">{issue.content}</p>
                     </div>
 
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#EAF7EF] text-[#16A34A] border border-[#D1EBD9] whitespace-nowrap">
-                      {t.status[currentStatus as keyof typeof t.status] || currentStatus}
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
+                        currentStatus === 'RESOLVED'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : currentStatus === 'IN_PROGRESS'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {t.status[currentStatus as keyof typeof t.status] || currentStatus.replace(/_/g, ' ')}
                     </span>
                   </div>
 
@@ -214,10 +450,12 @@ export const OfficialPortalView: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {isUpdating && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#16A34A]" />}
                       <select
                         value={currentStatus}
-                        onChange={(e) => handleStatusChange(issue.id, e.target.value as IssueStatus)}
-                        className="px-2 py-1 rounded-lg bg-white border border-[#E4EBE6] text-xs text-[#17231D] outline-none font-medium"
+                        disabled={isUpdating}
+                        onChange={(e) => handleIssueStatusChange(issue.id, e.target.value as IssueStatus)}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-[#E4EBE6] text-xs font-bold text-[#17231D] outline-none cursor-pointer hover:border-[#16A34A] transition-colors"
                       >
                         <option value="UNDER_REVIEW">Under Review</option>
                         <option value="VERIFIED">Verified by Engineer</option>

@@ -3,12 +3,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, AlertCircle, Compass, User as UserIcon, Plus } from 'lucide-react';
+import { Home, AlertCircle, Compass, User as UserIcon, Plus, MessagesSquare } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 
 interface NavItem {
-  id: 'home' | 'grievances' | 'create' | 'discover' | 'profile';
+  id: 'home' | 'grievances' | 'create' | 'discussions' | 'profile';
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -24,7 +24,7 @@ export const BottomNav: React.FC = () => {
     { id: 'home', href: '/', label: t.nav.home, icon: Home },
     { id: 'grievances', href: '/grievances', label: t.nav.grievances, icon: AlertCircle },
     { id: 'create', href: '#', label: '', icon: Plus, isAction: true },
-    { id: 'discover', href: '/discover', label: t.nav.discover, icon: Compass },
+    { id: 'discussions', href: '/discussions', label: language === 'ml' ? 'ചർച്ചകൾ' : 'Chat', icon: MessagesSquare },
     { id: 'profile', href: '/profile', label: t.nav.profile, icon: UserIcon },
   ];
 
