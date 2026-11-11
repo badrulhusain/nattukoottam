@@ -48,7 +48,7 @@ interface AppState {
   prevStorySlide: () => void;
   isAddStoryOpen: boolean;
   setIsAddStoryOpen: (open: boolean) => void;
-  addStory: (newStory: { mediaUrl: string; caption?: string; locality?: string }) => void;
+  addStory: (newStory: { id?: string; mediaUrl: string; caption?: string; locality?: string }) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -192,7 +192,7 @@ export const useAppStore = create<AppState>((set) => ({
   addStory: (newStory) =>
     set((state) => {
       const storyItem: StoryItem = {
-        id: `story_${Date.now()}`,
+        id: newStory.id || `story_${Date.now()}`,
         mediaUrl: newStory.mediaUrl,
         caption: newStory.caption,
         createdAt: 'Just now',

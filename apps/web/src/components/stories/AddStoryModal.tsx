@@ -12,7 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
-import { uploadMediaApi } from '../../lib/api';
+import { uploadMediaApi, createLivePostApi } from '../../lib/api';
 import { EXTENDED_KERALA_LOCALITIES } from '../../lib/geolocation';
 
 export const AddStoryModal: React.FC = () => {
@@ -20,6 +20,7 @@ export const AddStoryModal: React.FC = () => {
     isAddStoryOpen,
     setIsAddStoryOpen,
     addStory,
+    addPost,
     language,
     currentLocality,
     currentUser,
@@ -32,6 +33,7 @@ export const AddStoryModal: React.FC = () => {
   const [caption, setCaption] = useState('');
   const [selectedLocality, setSelectedLocality] = useState(currentLocality || 'Kakkanad');
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   if (!isAddStoryOpen) return null;
@@ -84,7 +86,7 @@ export const AddStoryModal: React.FC = () => {
     }
   };
 
-  const handlePostStory = (e: React.FormEvent) => {
+  const handlePostStory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mediaUrl) return;
 
@@ -93,15 +95,69 @@ export const AddStoryModal: React.FC = () => {
       return;
     }
 
-    addStory({
-      mediaUrl,
-      caption: caption.trim(),
-      locality: selectedLocality,
-    });
+    setIsSubmitting(true);
+    setUploadError(null);
 
-    setMediaUrl('');
-    setCaption('');
-    setIsAddStoryOpen(false);
+    const storyCaption = caption.trim() || (language === 'ml' ? 'വാർഡ് സ്റ്റോറി' : 'Ward Story');
+    const locality = selectedLocality || currentUser.locality || 'Kakkanad';
+    const district = currentUser.district || 'Ernakulam';
+
+    try {
+      // 1. Save story to Neon DB as a community post with media
+      const res = await createLivePostApi({
+        content: storyCaption,
+        category: 'OTHER',
+        locality,
+        district,
+        mediaUrls: [mediaUrl],
+        language: language || 'ml',
+      });
+
+      const postId = res?.id || `story_${Date.now()}`;
+
+      // 2. Add to Zustand store stories so it is interactive immediately
+      addStory({
+        id: postId,
+        mediaUrl,
+        caption: storyCaption,
+        locality,
+      });
+
+      // 3. Add to Zustand store posts
+      addPost({
+        id: postId,
+        author: {
+          id: currentUser.id,
+          fullName: currentUser.fullName,
+          username: currentUser.username,
+          avatarUrl: currentUser.avatarUrl,
+          locality,
+        },
+        content: storyCaption,
+        category: 'OTHER',
+        locality,
+        district,
+        mediaUrls: [mediaUrl],
+        isInfrastructureIssue: false,
+      });
+
+      setMediaUrl('');
+      setCaption('');
+      setIsAddStoryOpen(false);
+    } catch (err: any) {
+      console.error('Failed to post story to database:', err);
+      // Fallback to local store if offline
+      addStory({
+        mediaUrl,
+        caption: storyCaption,
+        locality,
+      });
+      setMediaUrl('');
+      setCaption('');
+      setIsAddStoryOpen(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -239,11 +295,20 @@ export const AddStoryModal: React.FC = () => {
 
             <button
               type="submit"
-              disabled={!mediaUrl || isUploading}
+              disabled={!mediaUrl || isUploading || isSubmitting}
               className="py-2 px-4 rounded-xl bg-gradient-to-tr from-emerald-600 to-[#16A34A] hover:opacity-95 text-white font-bold text-xs shadow-md shadow-[#16A34A]/20 transition-all disabled:opacity-50 flex items-center gap-1.5 active-press"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>{language === 'ml' ? 'സ്റ്റോറി പങ്കിടുക' : 'Share Story'}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>{language === 'ml' ? 'സൂക്ഷിക്കുന്നു...' : 'Saving...'}</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{language === 'ml' ? 'സ്റ്റോറി പങ്കിടുക' : 'Share Story'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>
