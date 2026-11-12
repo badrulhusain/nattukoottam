@@ -12,14 +12,20 @@ const nextConfig = {
   ],
   reactStrictMode: false,
 
-  // Automatically proxy all frontend /api requests to the local NestJS backend on port 3000.
-  // This allows any external device on the local network (mobile, friend's laptop) to access
-  // the entire API seamlessly without opening port 3000 in Windows Firewall or facing CORS blocks!
+  // Automatically proxy all frontend /api requests to the NestJS backend.
+  // In development, this points to localhost:3000/api.
+  // In production on Vercel, this points to API_URL or NEXT_PUBLIC_API_URL.
   async rewrites() {
+    const rawTarget =
+      process.env.API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:3000/api';
+    const apiTarget = rawTarget.replace(/\/$/, '');
+
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3000/api/:path*',
+        destination: `${apiTarget}/:path*`,
       },
     ];
   },

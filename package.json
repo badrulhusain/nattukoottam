@@ -9,6 +9,7 @@
     "build": "nx run-many --target=build --all",
     "build:web": "nx build web",
     "build:api": "nx build api",
+    "vercel-build": "prisma generate && nx build web",
     "start:api": "node dist/apps/api/main.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push"

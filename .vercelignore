@@ -1,0 +1,10 @@
+.git
+.github
+dist/apps/api
+tmp
+.nx/cache
+.nx/workspace-data
+.idea
+.vscode
+*.log
+
