@@ -1,18 +1,16 @@
 /**
- * Dynamically resolves the API base URL.
- * When accessed from a local network device (e.g. friend's laptop or mobile on 192.168.0.111:4200),
- * this uses the relative '/api' route which is proxied by Next.js rewrites on port 4200 directly
- * to the backend on port 3000.
- * This completely avoids Windows Firewall port 3000 blocks and cross-origin CORS failures!
+ * Resolves an absolute API base URL for both fetch() and new URL().
+ * In the browser, /api uses the current origin so Next.js can proxy requests
+ * to the backend, including when the app is opened from another LAN device.
+ * Server-side requests use the local backend origin by default.
  */
 export function getApiBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  if (typeof window !== 'undefined') {
-    return '/api';
-  }
-  return 'http://localhost:3000/api';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+  const origin = typeof window !== 'undefined'
+    ? window.location.origin
+    : 'http://localhost:3000';
+
+  return new URL(apiBase, origin).toString().replace(/\/+$/, '');
 }
 
 const TOKEN_KEY = 'naatukoottam_access_token';
