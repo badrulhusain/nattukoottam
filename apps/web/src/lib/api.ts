@@ -13,6 +13,21 @@ export function getApiBaseUrl(): string {
   return new URL(apiBase, origin).toString().replace(/\/+$/, '');
 }
 
+export function buildApiUrl(
+  endpoint: string,
+  params?: Record<string, string | number | undefined>,
+): string {
+  const url = new URL(`${getApiBaseUrl()}/${endpoint.replace(/^\/+/, '')}`);
+
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined && value !== '') {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  return url.toString();
+}
+
 const TOKEN_KEY = 'naatukoottam_access_token';
 const REFRESH_KEY = 'naatukoottam_refresh_token';
 
@@ -38,15 +53,31 @@ export function removeStoredTokens() {
   localStorage.removeItem(REFRESH_KEY);
 }
 
-export function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(jsonBody = true): HeadersInit {
   const token = getStoredToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
+  const headers: HeadersInit = {};
+  if (jsonBody) headers['Content-Type'] = 'application/json';
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
+}
+
+async function readApiResponse(res: Response, fallbackMessage: string) {
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = data?.message;
+    throw new Error(
+      (Array.isArray(message) ? message.join(', ') : message) ||
+      (res.status >= 500
+        ? `${fallbackMessage} (HTTP ${res.status}). Check that the backend API is running and reachable.`
+        : `${fallbackMessage} (HTTP ${res.status}).`),
+    );
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error(`${fallbackMessage}: the backend returned an invalid JSON response.`);
+  }
+  return data;
 }
 
 export interface LoginParams {
@@ -121,10 +152,7 @@ export async function syncClerkUserApi(params: {
     headers: getAuthHeaders(),
     body: JSON.stringify(params),
   });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.message || 'Failed to sync Clerk user');
-  }
+  const data = await readApiResponse(res, 'Failed to sync Clerk user');
   // Store tokens if provided
   if (data.tokens?.accessToken) {
     saveStoredTokens(data.tokens.accessToken, data.tokens.refreshToken);
@@ -220,8 +248,8 @@ export async function createLivePostApi(postData: any) {
 
 export async function transcribeVoiceAudioApi(
   audioBlob: Blob,
-  language: string = 'ml',
-  uploadAudio: boolean = true
+  language = 'ml',
+  uploadAudio = true
 ): Promise<{ text: string; audioUrl?: string; warning?: string; error?: string }> {
   try {
     const apiBase = getApiBaseUrl();
@@ -232,16 +260,12 @@ export async function transcribeVoiceAudioApi(
 
     const res = await fetch(`${apiBase}/storage/transcribe?upload=${uploadAudio ? 'true' : 'false'}`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      // Let fetch set the multipart content type, including the audio boundary.
+      headers: getAuthHeaders(false),
       body: formData,
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      throw new Error(err?.message || 'Failed to transcribe audio');
-    }
-
-    return await res.json();
+    return await readApiResponse(res, 'Failed to transcribe audio');
   } catch (error: any) {
     console.warn('Transcription API error:', error);
     return { text: '', error: error.message };
