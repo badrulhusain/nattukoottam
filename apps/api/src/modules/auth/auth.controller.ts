@@ -4,6 +4,7 @@ import {
   Patch,
   Body,
   Get,
+  Param,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -106,10 +107,25 @@ export class AuthController {
   }
 
   @Public()
-  @Post('clerk-sync')
-  @ApiOperation({ summary: 'Synchronize a user authenticated via Clerk with Neon database' })
-  async syncClerkUser(@Body() body: any) {
-    return this.authService.syncClerkUser(body);
+  @Get('users/:identifier')
+  @ApiOperation({ summary: 'Get public profile of another citizen or official' })
+  async getUserProfile(
+    @Param('identifier') identifier: string,
+    @CurrentUser('id') currentUserId?: string
+  ) {
+    return this.authService.getUserProfile(identifier, currentUserId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('users/:id/follow')
+  @ApiBearerAuth('bearer-jwt')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Toggle follow / unfollow another citizen' })
+  async toggleFollow(
+    @Param('id') targetUserId: string,
+    @CurrentUser('id') currentUserId: string
+  ) {
+    return this.authService.toggleFollowUser(currentUserId, targetUserId);
   }
 }
 

@@ -42,6 +42,8 @@ export interface User {
   grievancesCount: number;
   postsCount: number;
   preferredLang: Language;
+  karmaPoints?: number;
+  badges?: string[];
 }
 
 export interface Post {
@@ -52,6 +54,9 @@ export interface Post {
     username: string;
     avatarUrl?: string;
     locality: string;
+    role?: Role;
+    karmaPoints?: number;
+    badges?: string[];
   };
   content: string;
   category?: IssueCategory;
@@ -72,6 +77,23 @@ export interface Post {
   createdAt: string;
   isInfrastructureIssue?: boolean;
   status?: IssueStatus;
+  voiceAudioUrl?: string;
+  hasVoiceInPhoto?: boolean;
+  department?: {
+    id?: string;
+    name?: string;
+    code?: string;
+  };
+  resolutionNotes?: string;
+  assignedDeptId?: string;
+  isAnonymous?: boolean;
+  history?: Array<{
+    id: string;
+    actor?: { fullName: string; role: string };
+    toStatus: string;
+    notes?: string;
+    createdAt: string;
+  }>;
 }
 
 export interface InfrastructureIssue {

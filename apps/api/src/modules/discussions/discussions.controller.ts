@@ -9,7 +9,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Sse,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DiscussionsService } from './discussions.service';
 import {
@@ -51,6 +53,20 @@ export class DiscussionsController {
     @Body() dto: CreateDiscussionRoomDto
   ) {
     return this.discussionsService.create(userId, dto);
+  }
+
+  @Post('direct/:targetUserId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer-jwt')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get or create a 1-on-1 direct message conversation with another citizen',
+  })
+  async getOrCreateDirect(
+    @CurrentUser('id') userId: string,
+    @Param('targetUserId') targetUserId: string
+  ) {
+    return this.discussionsService.getOrCreateDirectRoom(userId, targetUserId);
   }
 
   @Public()
@@ -126,6 +142,13 @@ export class DiscussionsController {
     @Body() dto: SendMessageDto
   ) {
     return this.discussionsService.sendMessage(id, userId, dto);
+  }
+
+  @Public()
+  @Sse(':id/stream')
+  @ApiOperation({ summary: 'Real-time SSE event stream for new discussion messages' })
+  streamMessages(@Param('id') id: string): Observable<any> {
+    return this.discussionsService.getMessageStream(id);
   }
 }
 

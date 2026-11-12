@@ -124,6 +124,11 @@ export class QueryProjectsDto {
   @IsEnum(ProjectStatus)
   status?: ProjectStatus;
 
+  @ApiPropertyOptional({ example: 'dept_pwd_01' })
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)

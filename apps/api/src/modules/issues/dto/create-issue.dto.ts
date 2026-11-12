@@ -70,6 +70,15 @@ export class CreateIssueDto {
   @IsArray()
   @IsString({ each: true })
   evidenceUrls?: string[];
+
+  @ApiPropertyOptional({ example: 'https://res.cloudinary.com/.../voice.webm' })
+  @IsOptional()
+  @IsString()
+  voiceAudioUrl?: string;
+
+  @ApiPropertyOptional({ example: false, default: false })
+  @IsOptional()
+  isAnonymous?: boolean;
 }
 
 export class UpdateIssueStatusDto {
@@ -118,6 +127,11 @@ export class QueryIssuesDto {
   @IsOptional()
   @IsEnum(UrgencyLevel)
   urgency?: UrgencyLevel;
+
+  @ApiPropertyOptional({ example: 'dept_pwd_01' })
+  @IsOptional()
+  @IsString()
+  assignedDeptId?: string;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

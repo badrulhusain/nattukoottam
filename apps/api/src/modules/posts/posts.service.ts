@@ -18,6 +18,8 @@ export class PostsService {
         latitude: dto.latitude,
         longitude: dto.longitude,
         language: dto.language || 'ml',
+        voiceAudioUrl: dto.voiceAudioUrl,
+        isAnonymous: dto.isAnonymous ?? false,
         media: dto.mediaUrls && dto.mediaUrls.length > 0
           ? {
               create: dto.mediaUrls.map((url) => ({
@@ -58,6 +60,9 @@ export class PostsService {
     if (query.category) {
       where.category = query.category;
     }
+    if (query.authorId) {
+      where.authorId = query.authorId;
+    }
 
     const [total, posts] = await Promise.all([
       this.prisma.post.count({ where }),
@@ -96,6 +101,17 @@ export class PostsService {
 
     const formatted = posts.map((post: any) => ({
       ...post,
+      author: post.isAnonymous
+        ? {
+            id: 'anonymous',
+            fullName: `വാർഡ് നിവാസി (${post.locality})`,
+            username: 'ward_resident',
+            avatarUrl: '',
+            locality: post.locality,
+            district: post.district,
+            role: 'CITIZEN',
+          }
+        : post.author,
       isLiked: Boolean(post.likes && post.likes.length > 0),
       likesCount: post._count.likes,
       commentsCount: post._count.comments,

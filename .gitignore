@@ -7,7 +7,17 @@ out-tsc
 
 # dependencies
 node_modules
-.env*
+# Environment variables & secrets
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+*.pem
+*.key
+*.cert
+credentials.json
+client_secret*.json
 # IDEs and editors
 /.idea
 .project
@@ -48,7 +58,6 @@ Thumbs.db
 vitest.config.*.timestamp*
 .vitest
 .neon
-.env.local
 
 # Next.js
 .next

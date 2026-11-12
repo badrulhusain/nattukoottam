@@ -2,7 +2,14 @@ import { create } from 'zustand';
 import { Language, Post, User, UserStory, StoryItem } from '../types';
 import { GUEST_USER, INITIAL_POSTS_MOCK, KERALA_LOCALITIES } from './constants';
 import { DetectedLocation, getSavedLocation, saveLocationToStorage } from './geolocation';
-import { removeStoredTokens, updateUserLocationApi } from './api';
+import {
+  removeStoredTokens,
+  updateUserLocationApi,
+  fetchNotificationsApi,
+  markNotificationReadApi,
+  markAllNotificationsReadApi,
+  LiveNotification,
+} from './api';
 
 interface AppState {
   language: Language;
@@ -49,6 +56,36 @@ interface AppState {
   isAddStoryOpen: boolean;
   setIsAddStoryOpen: (open: boolean) => void;
   addStory: (newStory: { id?: string; mediaUrl: string; caption?: string; locality?: string }) => void;
+
+  // Social Following State
+  followingIds: string[];
+  toggleFollowUser: (userId: string) => boolean;
+
+  // In-App Notifications State
+  notifications: LiveNotification[];
+  unreadNotificationsCount: number;
+  fetchNotifications: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+}
+
+const FOLLOWING_STORAGE_KEY = 'nattukuttam_following_users';
+
+function getInitialFollowing(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(FOLLOWING_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFollowingToStorage(ids: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(FOLLOWING_STORAGE_KEY, JSON.stringify(ids));
+  } catch {}
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -284,5 +321,46 @@ export const useAppStore = create<AppState>((set) => ({
         return post;
       }),
     })),
+
+  followingIds: getInitialFollowing(),
+  toggleFollowUser: (userId) => {
+    let newState = false;
+    set((state) => {
+      const exists = state.followingIds.includes(userId);
+      newState = !exists;
+      const updated = exists
+        ? state.followingIds.filter((id) => id !== userId)
+        : [...state.followingIds, userId];
+      saveFollowingToStorage(updated);
+      return { followingIds: updated };
+    });
+    return newState;
+  },
+
+  notifications: [],
+  unreadNotificationsCount: 0,
+  fetchNotifications: async () => {
+    const res = await fetchNotificationsApi();
+    set({
+      notifications: res.notifications,
+      unreadNotificationsCount: res.unreadCount,
+    });
+  },
+  markNotificationRead: async (id) => {
+    await markNotificationReadApi(id);
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, isRead: true } : n
+      ),
+      unreadNotificationsCount: Math.max(0, state.unreadNotificationsCount - 1),
+    }));
+  },
+  markAllNotificationsRead: async () => {
+    await markAllNotificationsReadApi();
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
+      unreadNotificationsCount: 0,
+    }));
+  },
 }));
 

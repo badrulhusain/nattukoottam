@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -42,8 +42,14 @@ export const AppHeader: React.FC = () => {
     setIsAuthModalOpen,
     setIsLocationPromptOpen,
     logout,
+    unreadNotificationsCount,
+    fetchNotifications,
   } = useAppStore();
   const t = getT(language);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const { signOut } = useClerk();
 
@@ -206,7 +212,11 @@ export const AppHeader: React.FC = () => {
             title={t.nav.notifications}
           >
             <Bell className="w-4 h-4 sm:w-5 sm:h-5 stroke-[1.9]" />
-            <span className="absolute top-1 sm:top-1.5 right-1 sm:right-1.5 w-2 h-2 rounded-full bg-[#DC2626] ring-2 ring-white" />
+            {unreadNotificationsCount > 0 ? (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#DC2626] text-white text-[9px] font-extrabold flex items-center justify-center ring-2 ring-white">
+                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+              </span>
+            ) : null}
           </Link>
 
           {/* Authentication Action Pill */}

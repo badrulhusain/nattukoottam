@@ -179,21 +179,28 @@ export async function updateUserLocationApi(locationData: { locality: string; di
   }
 }
 
-export async function fetchLivePosts(locality?: string) {
+export async function fetchLivePosts(params?: string | { locality?: string; authorId?: string }) {
   try {
-    const apiBase = getApiBaseUrl();
-    const url = new URL(`${apiBase}/posts`);
-    if (locality) url.searchParams.set('locality', locality);
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const queryParams: Record<string, string | undefined> = {};
+    if (typeof params === 'string') {
+      queryParams.locality = params;
+    } else if (params) {
+      if (params.locality) queryParams.locality = params.locality;
+      if (params.authorId) queryParams.authorId = params.authorId;
+    }
+
+    const url = buildApiUrl('posts', queryParams);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch posts');
     const json = await res.json();
-    // Return clean data array directly without metadata wrap
     return Array.isArray(json) ? json : json.data || [];
   } catch (error) {
     console.warn('Backend API offline or unreachable, using client state:', error);
     return [];
   }
 }
+
+export const fetchPostsApi = fetchLivePosts;
 
 export async function createLivePostApi(postData: any) {
   const apiBase = getApiBaseUrl();
@@ -211,12 +218,50 @@ export async function createLivePostApi(postData: any) {
   return await res.json();
 }
 
-export async function fetchLiveIssues(locality?: string) {
+export async function transcribeVoiceAudioApi(
+  audioBlob: Blob,
+  language: string = 'ml',
+  uploadAudio: boolean = true
+): Promise<{ text: string; audioUrl?: string; warning?: string; error?: string }> {
   try {
     const apiBase = getApiBaseUrl();
-    const url = new URL(`${apiBase}/issues`);
-    if (locality) url.searchParams.set('locality', locality);
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const formData = new FormData();
+    const filename = `voice_note_${Date.now()}.${audioBlob.type.includes('mp4') ? 'm4a' : 'webm'}`;
+    formData.append('file', audioBlob, filename);
+    formData.append('language', language);
+
+    const res = await fetch(`${apiBase}/storage/transcribe?upload=${uploadAudio ? 'true' : 'false'}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.message || 'Failed to transcribe audio');
+    }
+
+    return await res.json();
+  } catch (error: any) {
+    console.warn('Transcription API error:', error);
+    return { text: '', error: error.message };
+  }
+}
+
+export async function fetchLiveIssues(params?: string | { locality?: string; district?: string; assignedDeptId?: string; status?: string }) {
+  try {
+    const queryParams: Record<string, string | undefined> = {};
+    if (typeof params === 'string') {
+      queryParams.locality = params;
+    } else if (params) {
+      if (params.locality) queryParams.locality = params.locality;
+      if (params.district) queryParams.district = params.district;
+      if (params.assignedDeptId) queryParams.assignedDeptId = params.assignedDeptId;
+      if (params.status) queryParams.status = params.status;
+    }
+
+    const url = buildApiUrl('issues', queryParams);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch issues');
     const json = await res.json();
     return Array.isArray(json) ? json : json.data || [];
@@ -241,12 +286,20 @@ export async function fetchLiveConflicts(locality?: string) {
   }
 }
 
-export async function fetchLiveProjects(locality?: string) {
+export async function fetchLiveProjects(params?: string | { locality?: string; district?: string; departmentId?: string; status?: string }) {
   try {
-    const apiBase = getApiBaseUrl();
-    const url = new URL(`${apiBase}/projects`);
-    if (locality) url.searchParams.set('locality', locality);
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const queryParams: Record<string, string | undefined> = {};
+    if (typeof params === 'string') {
+      queryParams.locality = params;
+    } else if (params) {
+      if (params.locality) queryParams.locality = params.locality;
+      if (params.district) queryParams.district = params.district;
+      if (params.departmentId) queryParams.departmentId = params.departmentId;
+      if (params.status) queryParams.status = params.status;
+    }
+
+    const url = buildApiUrl('projects', queryParams);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch projects');
     const json = await res.json();
     return Array.isArray(json) ? json : json.data || [];
@@ -254,6 +307,20 @@ export async function fetchLiveProjects(locality?: string) {
     console.warn('Backend API offline or unreachable:', error);
     return [];
   }
+}
+
+export async function createLiveProjectApi(projectData: any) {
+  const apiBase = getApiBaseUrl();
+  const res = await fetch(`${apiBase}/projects`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(projectData),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: 'Failed to create infrastructure project' }));
+    throw new Error(err.message || 'Failed to create infrastructure project');
+  }
+  return await res.json();
 }
 
 export async function updateProjectStatusApi(projectId: string, status: string) {
@@ -595,4 +662,190 @@ export async function leaveDiscussionApi(roomId: string, userId: string) {
     headers: getAuthHeaders(),
   });
   return res.ok;
+}
+
+export interface PublicUserProfile {
+  id: string;
+  fullName: string;
+  username: string;
+  email?: string;
+  phone?: string;
+  avatarUrl?: string;
+  locality?: string;
+  district?: string;
+  wardNumber?: number;
+  role?: string;
+  bio?: string;
+  followersCount: number;
+  followingCount: number;
+  postsCount: number;
+  grievancesCount: number;
+  isFollowing: boolean;
+  createdAt?: string;
+}
+
+export async function fetchUserProfileApi(identifier: string): Promise<PublicUserProfile | null> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/auth/users/${encodeURIComponent(identifier)}`, {
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn('Failed to fetch user profile:', err);
+    return null;
+  }
+}
+
+export async function toggleFollowUserApi(targetUserId: string): Promise<{ following: boolean; followersCount: number }> {
+  const apiBase = getApiBaseUrl();
+  const res = await fetch(`${apiBase}/auth/users/${encodeURIComponent(targetUserId)}/follow`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: 'Failed to update follow status' }));
+    throw new Error(error.message || 'Failed to follow user');
+  }
+  return await res.json();
+}
+
+export async function getOrCreateDirectRoomApi(targetUserId: string) {
+  const apiBase = getApiBaseUrl();
+  const res = await fetch(`${apiBase}/discussions/direct/${encodeURIComponent(targetUserId)}`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: 'Failed to start direct conversation' }));
+    throw new Error(error.message || 'Failed to start direct conversation');
+  }
+  return await res.json();
+}
+
+export interface LiveNotification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  metadata?: any;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export async function fetchNotificationsApi(): Promise<{ unreadCount: number; notifications: LiveNotification[] }> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/notifications`, {
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return { unreadCount: 0, notifications: [] };
+    return await res.json();
+  } catch (err) {
+    console.warn('Failed to fetch notifications:', err);
+    return { unreadCount: 0, notifications: [] };
+  }
+}
+
+export async function markNotificationReadApi(id: string): Promise<boolean> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+    });
+    return res.ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function markAllNotificationsReadApi(): Promise<boolean> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/notifications/read-all`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+    });
+    return res.ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function triggerEscalationScanApi(): Promise<{ escalatedCount: number; issues: any[] }> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/issues/escalate-scan`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) return { escalatedCount: 0, issues: [] };
+    return await res.json();
+  } catch (err) {
+    return { escalatedCount: 0, issues: [] };
+  }
+}
+
+export interface AiCivicResponse {
+  answer: string;
+  relevantIssues: {
+    id: string;
+    title: string;
+    category?: string;
+    status: string;
+    locality: string;
+    department?: string;
+  }[];
+  relevantProjects: {
+    id: string;
+    title: string;
+    status: string;
+    department: string;
+  }[];
+}
+
+export async function askAiAssistantApi(
+  question: string,
+  locality?: string,
+  district?: string
+): Promise<AiCivicResponse> {
+  const apiBase = getApiBaseUrl();
+  const res = await fetch(`${apiBase}/ai/ask`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ question, locality, district }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to communicate with AI Civic Assistant');
+  }
+  return await res.json();
+}
+
+export async function translateTextApi(
+  text: string,
+  targetLang: 'en' | 'ml' | 'ta'
+): Promise<{ translatedText: string; targetLang: string }> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/ai/translate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text, targetLang }),
+    });
+    if (!res.ok) {
+      return { translatedText: text, targetLang };
+    }
+    return await res.json();
+  } catch {
+    return { translatedText: text, targetLang };
+  }
 }
