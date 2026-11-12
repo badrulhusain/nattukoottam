@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAppStore } from '../../lib/store';
 import { fetchLivePosts, fetchLiveIssues, getCurrentUserApi } from '../../lib/api';
-import { getSavedLocation, saveLocationToStorage } from '../../lib/geolocation';
+import { getSavedLocation, saveLocationToStorage, reverseGeocodeCoordinates } from '../../lib/geolocation';
 import { Post } from '../../types';
 import { AppHeader } from './AppHeader';
 import { DesktopSidebar } from './DesktopSidebar';
@@ -13,6 +13,7 @@ import { BottomNav } from './BottomNav';
 import { OnboardingModal } from '../onboarding/OnboardingModal';
 import { CreatePostModal } from '../create/CreatePostModal';
 import { AuthModal } from '../auth/AuthModal';
+import { ClerkSyncHandler } from '../auth/ClerkSyncHandler';
 import { LocationPromptModal } from '../location/LocationPromptModal';
 import { StoryViewerModal } from '../stories/StoryViewerModal';
 import { AddStoryModal } from '../stories/AddStoryModal';
@@ -37,6 +38,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     setPosts,
     setLocality,
     setUserLocation,
+    saveAndSetUserLocation,
     setIsLocationPromptOpen,
     login,
     setActiveTab,
@@ -61,17 +63,43 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
   }, [pathname, setActiveTab]);
 
-  // Check for saved location on initial website open
+  // Check for saved location on initial website open; if missing, ask for location and cache it
   useEffect(() => {
     const saved = getSavedLocation();
     if (saved && saved.locality) {
       setLocality(saved.locality);
       setUserLocation(saved);
+      return;
+    }
+
+    // First time opening the website: ask for browser GPS location and save to cache
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude, accuracy } = position.coords;
+            const detected = await reverseGeocodeCoordinates(latitude, longitude, accuracy);
+            saveAndSetUserLocation(detected);
+          } catch (err) {
+            console.warn('GPS reverse geocode error:', err);
+            setIsLocationPromptOpen(true);
+          }
+        },
+        (error) => {
+          console.warn('Browser GPS prompt error or dismissed:', error.message);
+          // If browser prompt is blocked, dismissed, or unavailable, display prompt modal to pick ward
+          setIsLocationPromptOpen(true);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
     } else {
-      // First time opening the website: prompt user to set their ward location
       setIsLocationPromptOpen(true);
     }
-  }, [setLocality, setUserLocation, setIsLocationPromptOpen]);
+  }, [setLocality, setUserLocation, saveAndSetUserLocation, setIsLocationPromptOpen]);
 
   // Restore authenticated session from stored JWT if valid
   useEffect(() => {
@@ -231,6 +259,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
       {/* Mobile Bottom Dock Navigation */}
       <BottomNav />
+
+      {/* Clerk User Synchronization with Neon DB */}
+      <ClerkSyncHandler />
 
       {/* Onboarding Welcome Screen */}
       <OnboardingModal />

@@ -17,6 +17,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1165.0",
     "@clerk/backend": "^3.27.0",
+    "@clerk/nextjs": "^7.9.25",
     "@hookform/resolvers": "^7.0.5",
     "@neon/config": "^1.14.0",
     "@neon/env": "^2.1.3",

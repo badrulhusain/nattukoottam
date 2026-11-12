@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { UserAvatar } from '../ui/UserAvatar';
 import { EditProfileModal } from './EditProfileModal';
+import { useClerk } from '@clerk/nextjs';
 
 export const UserProfileView: React.FC = () => {
   const {
@@ -32,6 +33,16 @@ export const UserProfileView: React.FC = () => {
   const t = getT(language);
   const [activeTab, setActiveTab] = useState<'posts' | 'grievances' | 'supported' | 'about'>('posts');
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const { signOut } = useClerk();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch {
+      // ignore
+    }
+    logout();
+  };
 
   const userPosts = posts.filter(
     (p) =>
@@ -100,7 +111,7 @@ export const UserProfileView: React.FC = () => {
               </button>
               {isAuthenticated ? (
                 <button
-                  onClick={() => logout()}
+                  onClick={handleLogout}
                   className="py-2 px-3.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-semibold text-xs transition-colors flex items-center gap-1.5 active-press"
                   title="Sign out"
                 >

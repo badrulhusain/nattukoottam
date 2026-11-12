@@ -119,41 +119,65 @@ export class AuthService {
     }
   }
 
-  async syncClerkUser(clerkUser: {
-    id: string;
-    phone: string;
-    fullName: string;
+  async syncClerkUser(dto: {
+    clerkId?: string;
+    id?: string;
     email?: string;
+    phone?: string;
+    fullName?: string;
     avatarUrl?: string;
     district?: string;
     locality?: string;
   }) {
+    const targetId = dto.clerkId || dto.id;
     let user = await this.prisma.user.findFirst({
       where: {
-        OR: [{ phone: clerkUser.phone }, ...(clerkUser.email ? [{ email: clerkUser.email }] : [])],
+        OR: [
+          ...(targetId ? [{ id: targetId }] : []),
+          ...(dto.email ? [{ email: dto.email }] : []),
+          ...(dto.phone ? [{ phone: dto.phone }] : []),
+        ],
       },
     });
 
-    if (!user) {
-      const dummyPassword = await bcrypt.hash(`clerk_oauth_${Date.now()}`, 10);
-      user = await this.prisma.user.create({
+    if (user) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
         data: {
-          fullName: clerkUser.fullName || 'Citizen',
-          phone: clerkUser.phone || `clerk_${clerkUser.id}`,
-          email: clerkUser.email,
-          avatarUrl: clerkUser.avatarUrl,
-          passwordHash: dummyPassword,
-          district: clerkUser.district || 'Ernakulam',
-          locality: clerkUser.locality || 'Kakkanad',
-          isVerified: true,
-          role: Role.CITIZEN,
+          fullName: dto.fullName || user.fullName,
+          avatarUrl: dto.avatarUrl || user.avatarUrl,
+          email: dto.email || user.email,
         },
       });
-      this.logger.log(`Synced new user from Clerk: ${user.fullName} (${user.id})`);
+      this.logger.log(`Synced existing user with Clerk: ${user.fullName} (${user.id})`);
+    } else {
+      const safeId = targetId || `clerk_${Date.now()}`;
+      const safePhone = dto.phone || `clerk_${safeId}`;
+      const safeFullName = dto.fullName || dto.email?.split('@')[0] || 'Community Citizen';
+      user = await this.prisma.user.create({
+        data: {
+          id: safeId,
+          fullName: safeFullName,
+          email: dto.email,
+          phone: safePhone,
+          passwordHash: 'CLERK_MANAGED_AUTH',
+          avatarUrl: dto.avatarUrl,
+          district: dto.district || 'Ernakulam',
+          locality: dto.locality || 'Kakkanad',
+          role: Role.CITIZEN,
+          isVerified: true,
+        },
+      });
+      this.logger.log(`Created new user from Clerk: ${user.fullName} (${user.id})`);
     }
 
     const tokens = await this.generateTokens(user);
-    return { user: this.sanitizeUser(user), tokens };
+    await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
+
+    return {
+      user: this.sanitizeUser(user),
+      tokens,
+    };
   }
 
   async updateLocation(userId: string, dto: { locality: string; district: string; wardNumber?: number }) {
@@ -198,6 +222,8 @@ export class AuthService {
     this.logger.log(`Updated profile for user ${userId} (${updated.fullName})`);
     return this.sanitizeUser(updated);
   }
+
+
 
   private async generateTokens(user: User) {
     const payload = {

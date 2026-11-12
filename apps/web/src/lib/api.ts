@@ -125,6 +125,34 @@ export async function registerApi(params: RegisterParams) {
   return data;
 }
 
+export async function syncClerkUserApi(data: {
+  clerkId: string;
+  email?: string;
+  phone?: string;
+  fullName?: string;
+  avatarUrl?: string;
+  district?: string;
+  locality?: string;
+}) {
+  const apiBase = getApiBaseUrl();
+  const res = await fetch(`${apiBase}/auth/clerk-sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: 'Clerk sync failed' }));
+    throw new Error(err.message || 'Failed to synchronize Clerk user');
+  }
+
+  const result = await res.json();
+  if (result.tokens?.accessToken) {
+    saveStoredTokens(result.tokens.accessToken, result.tokens.refreshToken);
+  }
+  return result;
+}
+
 export async function getCurrentUserApi() {
   const token = getStoredToken();
   if (!token) return null;

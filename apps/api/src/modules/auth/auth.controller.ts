@@ -46,6 +46,25 @@ export class AuthController {
     return this.authService.refreshTokens(dto);
   }
 
+  @Public()
+  @Post('clerk-sync')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Synchronize Clerk authenticated user with Neon database' })
+  async syncClerk(
+    @Body()
+    dto: {
+      clerkId: string;
+      email?: string;
+      phone?: string;
+      fullName?: string;
+      avatarUrl?: string;
+      district?: string;
+      locality?: string;
+    }
+  ) {
+    return this.authService.syncClerkUser(dto);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
   @ApiBearerAuth('bearer-jwt')
