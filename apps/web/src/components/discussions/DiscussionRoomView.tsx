@@ -26,6 +26,7 @@ import {
   sendDiscussionMessageApi,
   joinChannelApi,
   uploadMediaApi,
+  getApiBaseUrl,
 } from '../../lib/api';
 import { DiscussionRoom, DiscussionMessage, DiscussionMember } from '../../types';
 import { UserAvatar } from '../ui/UserAvatar';
@@ -91,12 +92,44 @@ export const DiscussionRoomView: React.FC<DiscussionRoomViewProps> = ({ roomId, 
     loadRoomData();
     loadMessages();
 
-    // Auto-refresh chat messages every 4 seconds
+    // Real-time EventSource Stream for instant live messages
+    let eventSource: EventSource | null = null;
+    try {
+      const apiBase = getApiBaseUrl();
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+      const streamUrl = apiBase.startsWith('http')
+        ? `${apiBase}/discussions/${roomId}/stream`
+        : `${origin}${apiBase}/discussions/${roomId}/stream`;
+
+      eventSource = new EventSource(streamUrl);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed && parsed.id) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === parsed.id)) return prev;
+              return [...prev, parsed];
+            });
+            setTimeout(scrollToBottom, 50);
+          }
+        } catch (e) {
+          console.warn('Realtime event parse error:', e);
+        }
+      };
+    } catch (e) {
+      console.warn('EventSource failed, falling back to polling:', e);
+    }
+
+    // Safety fallback polling every 8s
     const interval = setInterval(() => {
       loadMessages();
-    }, 4000);
+    }, 8000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (eventSource) eventSource.close();
+      clearInterval(interval);
+    };
   }, [roomId]);
 
   useEffect(() => {

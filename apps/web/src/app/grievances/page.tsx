@@ -23,7 +23,7 @@ export default function GrievancesPage() {
 
   // Grievances filtered by category and feed filter
   const filteredGrievances = useMemo(() => {
-    let list = posts.filter((p) => p.isInfrastructureIssue || p.urgency);
+    let list = posts.filter((p) => p.isInfrastructureIssue || p.status || p.urgency || (p.category && p.category !== 'OTHER'));
 
     if (activeCategory !== 'all') {
       list = list.filter((p) => p.category === activeCategory);

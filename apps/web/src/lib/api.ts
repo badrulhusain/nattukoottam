@@ -743,3 +743,128 @@ export async function getOrCreateDirectRoomApi(targetUserId: string) {
   }
   return await res.json();
 }
+
+export interface LiveNotification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  metadata?: any;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export async function fetchNotificationsApi(): Promise<{ unreadCount: number; notifications: LiveNotification[] }> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/notifications`, {
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return { unreadCount: 0, notifications: [] };
+    return await res.json();
+  } catch (err) {
+    console.warn('Failed to fetch notifications:', err);
+    return { unreadCount: 0, notifications: [] };
+  }
+}
+
+export async function markNotificationReadApi(id: string): Promise<boolean> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+    });
+    return res.ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function markAllNotificationsReadApi(): Promise<boolean> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/notifications/read-all`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+    });
+    return res.ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function triggerEscalationScanApi(): Promise<{ escalatedCount: number; issues: any[] }> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/issues/escalate-scan`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) return { escalatedCount: 0, issues: [] };
+    return await res.json();
+  } catch (err) {
+    return { escalatedCount: 0, issues: [] };
+  }
+}
+
+export interface AiCivicResponse {
+  answer: string;
+  relevantIssues: {
+    id: string;
+    title: string;
+    category?: string;
+    status: string;
+    locality: string;
+    department?: string;
+  }[];
+  relevantProjects: {
+    id: string;
+    title: string;
+    status: string;
+    department: string;
+  }[];
+}
+
+export async function askAiAssistantApi(
+  question: string,
+  locality?: string,
+  district?: string
+): Promise<AiCivicResponse> {
+  const apiBase = getApiBaseUrl();
+  const res = await fetch(`${apiBase}/ai/ask`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ question, locality, district }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to communicate with AI Civic Assistant');
+  }
+  return await res.json();
+}
+
+export async function translateTextApi(
+  text: string,
+  targetLang: 'en' | 'ml' | 'ta'
+): Promise<{ translatedText: string; targetLang: string }> {
+  try {
+    const apiBase = getApiBaseUrl();
+    const res = await fetch(`${apiBase}/ai/translate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text, targetLang }),
+    });
+    if (!res.ok) {
+      return { translatedText: text, targetLang };
+    }
+    return await res.json();
+  } catch {
+    return { translatedText: text, targetLang };
+  }
+}

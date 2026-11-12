@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { Subject, Observable } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
 import { PrismaService } from '../../database/prisma.service';
 import {
   CreateDiscussionRoomDto,
@@ -16,7 +18,16 @@ import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class DiscussionsService {
+  private readonly messageEvents$ = new Subject<{ roomId: string; message: any }>();
+
   constructor(private readonly prisma: PrismaService) {}
+
+  getMessageStream(roomId: string): Observable<{ data: any }> {
+    return this.messageEvents$.asObservable().pipe(
+      filter((event) => event.roomId === roomId),
+      map((event) => ({ data: event.message }))
+    );
+  }
 
   async findAll(userId?: string, query?: QueryDiscussionsDto) {
     const where: any = {};
@@ -513,6 +524,9 @@ export class DiscussionsService {
       where: { id: roomId },
       data: { updatedAt: new Date() },
     });
+
+    // Broadcast to real-time subscribers
+    this.messageEvents$.next({ roomId, message });
 
     return message;
   }

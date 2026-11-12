@@ -22,6 +22,7 @@ export class IssuesService {
         longitude: dto.longitude,
         reporterId: userId,
         voiceAudioUrl: dto.voiceAudioUrl,
+        isAnonymous: dto.isAnonymous ?? false,
         status: 'REPORTED',
         evidences: dto.evidenceUrls && dto.evidenceUrls.length > 0
           ? {
@@ -48,6 +49,8 @@ export class IssuesService {
             avatarUrl: true,
             locality: true,
             district: true,
+            karmaPoints: true,
+            badges: true,
           },
         },
         evidences: true,
@@ -58,6 +61,8 @@ export class IssuesService {
         },
       },
     });
+
+    await this.awardKarma(userId, 20);
 
     return issue;
   }
@@ -109,6 +114,19 @@ export class IssuesService {
             },
           },
           evidences: true,
+          history: {
+            include: {
+              actor: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  role: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          },
           supports: currentUserId
             ? {
                 where: { userId: currentUserId },
@@ -126,6 +144,15 @@ export class IssuesService {
 
     const formatted = issues.map((issue: any) => ({
       ...issue,
+      reporter: issue.isAnonymous
+        ? {
+            id: 'anonymous',
+            fullName: `വാർഡ് നിവാസി (${issue.locality})`,
+            avatarUrl: '',
+            locality: issue.locality,
+            district: issue.district,
+          }
+        : issue.reporter,
       isSupported: Boolean(issue.supports && issue.supports.length > 0),
       supportsCount: issue._count.supports,
     }));
@@ -144,6 +171,8 @@ export class IssuesService {
             avatarUrl: true,
             locality: true,
             district: true,
+            karmaPoints: true,
+            badges: true,
           },
         },
         department: true,
@@ -233,6 +262,7 @@ export class IssuesService {
         },
       });
       const count = await this.prisma.issueSupport.count({ where: { issueId } });
+      await this.awardKarma(userId, 5);
       return { supported: true, supportsCount: count };
     }
   }
@@ -277,6 +307,10 @@ export class IssuesService {
       },
     });
 
+    if (dto.status === 'RESOLVED') {
+      await this.awardKarma(issue.reporterId, 30);
+    }
+
     return updated;
   }
 
@@ -302,6 +336,111 @@ export class IssuesService {
     ]);
 
     return { success: true };
+  }
+
+  async checkNearbyDuplicates(lat: number, lng: number, radiusMeters = 200, category?: string) {
+    // 1 degree latitude is approx 111,000 meters
+    const deltaLat = radiusMeters / 111000;
+    const deltaLng = radiusMeters / (111000 * Math.cos(lat * (Math.PI / 180)));
+
+    const candidates = await this.prisma.issue.findMany({
+      where: {
+        latitude: {
+          gte: lat - deltaLat,
+          lte: lat + deltaLat,
+        },
+        longitude: {
+          gte: lng - deltaLng,
+          lte: lng + deltaLng,
+        },
+        status: {
+          notIn: ['RESOLVED', 'REJECTED'],
+        },
+        ...(category ? { category: category as any } : {}),
+      },
+      include: {
+        reporter: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+          },
+        },
+        _count: {
+          select: {
+            supports: true,
+          },
+        },
+      },
+      take: 6,
+    });
+
+    // Calculate exact Haversine distance in meters
+    return candidates
+      .map((issue) => {
+        const dLat = (issue.latitude! - lat) * (Math.PI / 180);
+        const dLng = (issue.longitude! - lng) * (Math.PI / 180);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat * (Math.PI / 180)) *
+            Math.cos(issue.latitude! * (Math.PI / 180)) *
+            Math.sin(dLng / 2) *
+            Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distanceMeters = Math.round(6371000 * c);
+
+        return {
+          id: issue.id,
+          title: issue.title,
+          description: issue.description,
+          category: issue.category,
+          urgency: issue.urgency,
+          status: issue.status,
+          locality: issue.locality,
+          address: issue.address,
+          latitude: issue.latitude,
+          longitude: issue.longitude,
+          distanceMeters,
+          supportsCount: issue._count.supports,
+          reporterName: issue.isAnonymous ? 'വാർഡ് നിവാസി / Ward Resident' : issue.reporter.fullName,
+          createdAt: issue.createdAt,
+        };
+      })
+      .filter((item) => item.distanceMeters <= radiusMeters)
+      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+  }
+
+  async awardKarma(userId: string, points: number) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, karmaPoints: true, badges: true },
+      });
+      if (!user) return;
+
+      const newKarma = (user.karmaPoints || 0) + points;
+      const badges = new Set(user.badges || []);
+
+      if (newKarma >= 150) {
+        badges.add('COMMUNITY_MODERATOR');
+      }
+      if (newKarma >= 50) {
+        badges.add('TOP_REPORTER');
+      }
+      if (points >= 30) {
+        badges.add('CIVIC_CHAMPION');
+      }
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          karmaPoints: newKarma,
+          badges: Array.from(badges),
+        },
+      });
+    } catch (err) {
+      // Non-blocking karma calculation
+    }
   }
 }
 

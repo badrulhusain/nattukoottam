@@ -11,6 +11,8 @@ import { IssuesModule } from '../modules/issues/issues.module';
 import { ProjectsModule } from '../modules/projects/projects.module';
 import { DepartmentsModule } from '../modules/departments/departments.module';
 import { DiscussionsModule } from '../modules/discussions/discussions.module';
+import { NotificationsModule } from '../modules/notifications/notifications.module';
+import { AiModule } from '../modules/ai/ai.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -31,6 +33,8 @@ import { AppService } from './app.service';
     ProjectsModule,
     DepartmentsModule,
     DiscussionsModule,
+    NotificationsModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],

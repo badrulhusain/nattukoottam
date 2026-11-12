@@ -2,7 +2,14 @@ import { create } from 'zustand';
 import { Language, Post, User, UserStory, StoryItem } from '../types';
 import { GUEST_USER, INITIAL_POSTS_MOCK, KERALA_LOCALITIES } from './constants';
 import { DetectedLocation, getSavedLocation, saveLocationToStorage } from './geolocation';
-import { removeStoredTokens, updateUserLocationApi } from './api';
+import {
+  removeStoredTokens,
+  updateUserLocationApi,
+  fetchNotificationsApi,
+  markNotificationReadApi,
+  markAllNotificationsReadApi,
+  LiveNotification,
+} from './api';
 
 interface AppState {
   language: Language;
@@ -53,6 +60,13 @@ interface AppState {
   // Social Following State
   followingIds: string[];
   toggleFollowUser: (userId: string) => boolean;
+
+  // In-App Notifications State
+  notifications: LiveNotification[];
+  unreadNotificationsCount: number;
+  fetchNotifications: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
 }
 
 const FOLLOWING_STORAGE_KEY = 'nattukuttam_following_users';
@@ -321,6 +335,32 @@ export const useAppStore = create<AppState>((set) => ({
       return { followingIds: updated };
     });
     return newState;
+  },
+
+  notifications: [],
+  unreadNotificationsCount: 0,
+  fetchNotifications: async () => {
+    const res = await fetchNotificationsApi();
+    set({
+      notifications: res.notifications,
+      unreadNotificationsCount: res.unreadCount,
+    });
+  },
+  markNotificationRead: async (id) => {
+    await markNotificationReadApi(id);
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, isRead: true } : n
+      ),
+      unreadNotificationsCount: Math.max(0, state.unreadNotificationsCount - 1),
+    }));
+  },
+  markAllNotificationsRead: async () => {
+    await markAllNotificationsReadApi();
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
+      unreadNotificationsCount: 0,
+    }));
   },
 }));
 

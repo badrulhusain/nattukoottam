@@ -75,6 +75,10 @@ export class CreateIssueDto {
   @IsOptional()
   @IsString()
   voiceAudioUrl?: string;
+
+  @ApiPropertyOptional({ example: false, default: false })
+  @IsOptional()
+  isAnonymous?: boolean;
 }
 
 export class UpdateIssueStatusDto {

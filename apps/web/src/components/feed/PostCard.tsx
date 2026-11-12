@@ -14,6 +14,7 @@ import {
   Share2,
   Send,
   AlertCircle,
+  AlertTriangle,
   Eye,
   Trash2,
   Loader2,
@@ -23,6 +24,13 @@ import {
   VolumeX,
   Play,
   Pause,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  Building2,
+  Sparkles,
+  History,
+  Globe,
 } from 'lucide-react';
 import { Post } from '../../types';
 import { useAppStore } from '../../lib/store';
@@ -33,6 +41,7 @@ import {
   toggleSupportApi,
   deletePostOrIssueApi,
   toggleFollowUserApi,
+  translateTextApi,
 } from '../../lib/api';
 
 interface PostCardProps {
@@ -108,6 +117,78 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+  const [translatedContent, setTranslatedContent] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isShowingTranslation, setIsShowingTranslation] = useState(false);
+
+  const handleToggleTranslation = async () => {
+    if (translatedContent) {
+      setIsShowingTranslation(!isShowingTranslation);
+      return;
+    }
+    setIsTranslating(true);
+    try {
+      const targetLang = language === 'ml' ? 'ml' : 'en';
+      const res = await translateTextApi(post.content, targetLang);
+      setTranslatedContent(res.translatedText);
+      setIsShowingTranslation(true);
+    } catch (err) {
+      console.warn('Translation failed:', err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const getStatusConfig = (status?: string) => {
+    switch (status) {
+      case 'RESOLVED':
+        return {
+          step: 4,
+          label: language === 'ml' ? 'പരിഹരിച്ചു (Resolved)' : 'Resolved & Inspected',
+          badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+          dotClass: 'bg-emerald-600',
+        };
+      case 'IN_PROGRESS':
+        return {
+          step: 3,
+          label: language === 'ml' ? 'പ്രവൃത്തി പുരോഗമിക്കുന്നു' : 'Work in Progress',
+          badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
+          dotClass: 'bg-blue-600 animate-pulse',
+        };
+      case 'VERIFIED':
+        return {
+          step: 2,
+          label: language === 'ml' ? 'എഞ്ചിനീയർ പരിശോധിച്ചു' : 'Verified by Engineer',
+          badgeClass: 'bg-purple-100 text-purple-800 border-purple-300',
+          dotClass: 'bg-purple-600',
+        };
+      case 'WAITING_FOR_COORDINATION':
+        return {
+          step: 2,
+          label: language === 'ml' ? 'വകുപ്പ് ഏകോപനം കാക്കുന്നു' : 'Coordination Required',
+          badgeClass: 'bg-orange-100 text-orange-800 border-orange-300',
+          dotClass: 'bg-orange-600',
+        };
+      case 'REJECTED':
+        return {
+          step: 0,
+          label: language === 'ml' ? 'തള്ളി (Rejected)' : 'Rejected / Not Feasible',
+          badgeClass: 'bg-red-100 text-red-800 border-red-300',
+          dotClass: 'bg-red-600',
+        };
+      case 'REPORTED':
+      case 'UNDER_REVIEW':
+      default:
+        return {
+          step: 1,
+          label: language === 'ml' ? 'പരിശോധനയിൽ (Review)' : 'Under Review',
+          badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+          dotClass: 'bg-amber-600',
+        };
+    }
   };
 
   const isAuthor =
@@ -222,6 +303,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   };
 
   const urgencyConfig = getUrgencyConfig(post.urgency);
+  const statusConfig = getStatusConfig(post.status);
 
   return (
     <article className="bg-white rounded-2xl p-4 sm:p-5 border border-[#E4EBE6] shadow-2xs hover:border-[#D0DBD3] transition-all space-y-3.5 group">
@@ -301,6 +383,26 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 </button>
               )}
 
+              {post.author.karmaPoints !== undefined && post.author.karmaPoints > 0 && (
+                <span
+                  className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200 flex items-center gap-0.5"
+                  title={`${post.author.karmaPoints} Civic Karma Points`}
+                >
+                  <span>⭐</span>
+                  <span>{post.author.karmaPoints}</span>
+                </span>
+              )}
+              {post.author.badges?.includes('TOP_REPORTER') && (
+                <span className="text-[9px] font-extrabold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                  🌟 Top Reporter
+                </span>
+              )}
+              {post.author.badges?.includes('COMMUNITY_MODERATOR') && (
+                <span className="text-[9px] font-extrabold text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">
+                  🛡️ Moderator
+                </span>
+              )}
+
               <span className="text-xs text-[#94A39B]">·</span>
               <span className="text-xs text-[#718078]">{post.createdAt}</span>
             </div>
@@ -319,12 +421,33 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   </span>
                 </>
               )}
+
+              {post.department?.name && (
+                <>
+                  <span className="text-[#94A39B]">·</span>
+                  <span className="text-emerald-800 font-bold bg-emerald-50 px-2 py-0.2 rounded-md border border-emerald-200 text-[10px] flex items-center gap-1">
+                    <Building2 className="w-3 h-3 text-emerald-600" />
+                    <span>{post.department.name}</span>
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Priority / Urgency Badge */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Priority & Status Badges */}
+        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+          {/* Official Grievance Status Badge */}
+          {(post.status || post.isInfrastructureIssue) && (
+            <span
+              className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${statusConfig.badgeClass}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotClass}`} />
+              <span>{statusConfig.label}</span>
+            </span>
+          )}
+
+          {/* Urgency Badge */}
           {post.urgency && (
             <span
               className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${urgencyConfig.badgeClass}`}
@@ -401,8 +524,38 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
       {/* Post Text Body */}
       <p className="text-[15.5px] text-[#17231D] leading-relaxed whitespace-pre-line font-normal">
-        {post.content}
+        {isShowingTranslation && translatedContent ? translatedContent : post.content}
       </p>
+
+      {/* 1-Click Multilingual AI Translation Toggle */}
+      <div className="flex items-center gap-2 -mt-1">
+        <button
+          type="button"
+          onClick={handleToggleTranslation}
+          disabled={isTranslating}
+          className="text-[11px] font-semibold text-[#16A34A] hover:text-[#15803D] hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+        >
+          <Globe className={`w-3 h-3 text-[#16A34A] ${isTranslating ? 'animate-spin' : ''}`} />
+          <span>
+            {isTranslating
+              ? language === 'ml'
+                ? 'വിവർത്തനം ചെയ്യുന്നു...'
+                : 'Translating via Groq...'
+              : isShowingTranslation
+              ? language === 'ml'
+                ? 'യഥാർത്ഥ ഉള്ളടക്കം കാണിക്കുക (Show Original)'
+                : 'Show Original'
+              : language === 'ml'
+              ? 'മലയാളത്തിലേക്ക് വിവർത്തനം ചെയ്യുക'
+              : 'Translate to English'}
+          </span>
+        </button>
+        {isShowingTranslation && (
+          <span className="text-[9.5px] font-semibold text-[#718078] bg-[#F8FAF8] px-1.5 py-0.5 rounded border border-[#E4EBE6]">
+            Groq AI ({language === 'ml' ? 'മലയാളം' : 'English'})
+          </span>
+        )}
+      </div>
 
       {/* Landmark / Ward Address Callout */}
       {post.address && post.address !== `${post.locality}, ${post.district}` && (
@@ -539,6 +692,170 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   aria-label={`Slide ${idx + 1}`}
                 />
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Official Resolution Note */}
+      {post.resolutionNotes && (
+        <div className="p-3 bg-emerald-50/90 rounded-xl border border-emerald-200/80 text-xs text-emerald-950 flex items-start gap-2.5 shadow-2xs">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5 flex-1">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                <span>{language === 'ml' ? 'വകുപ്പ് നടപടിക്കുറിപ്പ്' : 'Official Resolution Action'}</span>
+              </span>
+              {post.department?.name && (
+                <span className="text-[10px] text-emerald-700 bg-white px-2 py-0.5 rounded-md font-semibold border border-emerald-200">
+                  {post.department.name}
+                </span>
+              )}
+            </div>
+            <p className="text-[#17231D] text-xs font-medium leading-relaxed">{post.resolutionNotes}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-Escalated Accountability Alert Banner */}
+      {(post.status === 'WAITING_FOR_COORDINATION' ||
+        (post.history && post.history.some((h) => h.toStatus === 'WAITING_FOR_COORDINATION'))) && (
+        <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50/80 rounded-xl border border-amber-200 text-xs text-amber-950 flex items-start gap-2.5 shadow-2xs animate-in fade-in">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+          <div className="space-y-0.5 flex-1">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                <span>
+                  {language === 'ml'
+                    ? '⚠️ ഓട്ടോ-എസ്കലേഷൻ: അടിയന്തര ഭരണതല ഇടപെടൽ'
+                    : '⚠️ Auto-Escalated: District Administration Intervened'}
+                </span>
+              </span>
+              <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md font-bold border border-amber-200">
+                {language === 'ml' ? 'ഉയർന്ന മുൻഗണന' : 'High Priority'}
+              </span>
+            </div>
+            <p className="text-[11.5px] text-amber-900/90 leading-relaxed pt-0.5">
+              {language === 'ml'
+                ? 'പൗരന്മാരുടെ പിന്തുണയുള്ള ഈ പരാതിയിൽ നിശ്ചിത സമയത്തിനകം വകുപ്പുതല നടപടി ഉണ്ടാകാത്തതിനാൽ ജില്ലാ ഭരണകൂടം & LSGD സെക്രട്ടറി തലത്തിലേക്ക് ഓട്ടോ-എസ്കലേഷൻ ചെയ്യപ്പെട്ടിരിക്കുന്നു.'
+                : 'Due to lack of timely departmental progress on this citizen-backed report, it has been auto-escalated to District Administration & LSGD Secretariat for urgent intervention.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Civic Transparency Timeline Stepper */}
+      {(post.status || post.isInfrastructureIssue) && (
+        <div className="p-2.5 bg-[#F8FAF8] rounded-xl border border-[#E4EBE6] space-y-2">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setIsTimelineOpen(!isTimelineOpen)}
+              className="text-[11px] font-bold text-[#16A34A] hover:text-[#15803D] flex items-center gap-1.5 cursor-pointer"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>
+                {language === 'ml' ? 'ഔദ്യോഗിക പരിഹാര ഘട്ടങ്ങൾ' : 'Civic Transparency Timeline'}
+              </span>
+              <span className="text-[10px] text-[#718078] font-normal">
+                ({isTimelineOpen ? (language === 'ml' ? 'മറയ്ക്കുക' : 'Hide') : (language === 'ml' ? 'കാണുക' : 'View')})
+              </span>
+            </button>
+
+            <span className="text-[10px] font-bold text-[#718078]">
+              {statusConfig.step}/4 {language === 'ml' ? 'ഘട്ടം പൂർത്തിയായി' : 'Stages Complete'}
+            </span>
+          </div>
+
+          {/* Stepper Progress Bar (Always visible compact) */}
+          <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+            {[
+              { num: 1, label: language === 'ml' ? 'റിപ്പോർട്ട് ചെയ്തു' : 'Reported' },
+              { num: 2, label: language === 'ml' ? 'പരിശോധന' : 'Verified' },
+              { num: 3, label: language === 'ml' ? 'നിർമ്മാണം' : 'In Progress' },
+              { num: 4, label: language === 'ml' ? 'പരിഹരിച്ചു' : 'Resolved' },
+            ].map((st) => {
+              const isPastOrCurrent = statusConfig.step >= st.num;
+              const isCurrent = statusConfig.step === st.num;
+              return (
+                <div key={st.num} className="space-y-1">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${
+                      isPastOrCurrent
+                        ? st.num === 4
+                          ? 'bg-emerald-500'
+                          : 'bg-[#16A34A]'
+                        : 'bg-zinc-200'
+                    } ${isCurrent ? 'ring-2 ring-[#16A34A]/30' : ''}`}
+                  />
+                  <div
+                    className={`text-[9.5px] truncate font-medium ${
+                      isCurrent
+                        ? 'font-bold text-[#16A34A]'
+                        : isPastOrCurrent
+                        ? 'text-[#17231D]'
+                        : 'text-[#94A39B]'
+                    }`}
+                  >
+                    {st.label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {isTimelineOpen && (
+            <div className="pt-2 border-t border-[#E4EBE6] text-[11px] text-[#718078] space-y-2 animate-in fade-in duration-150">
+              {post.history && post.history.length > 0 ? (
+                <div className="space-y-1.5">
+                  {post.history.map((hist, idx) => (
+                    <div key={hist.id || idx} className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] mt-1.5 shrink-0" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[#17231D]">
+                            {hist.toStatus.replace(/_/g, ' ')}
+                            {hist.actor?.fullName && (
+                              <span className="font-normal text-[#718078] ml-1">
+                                · {hist.actor.fullName}
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-[10px] text-[#94A39B]">
+                            {new Date(hist.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {hist.notes && <p className="text-[#718078] text-[10.5px] mt-0.5">{hist.notes}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3 h-3 text-[#16A34A]" />
+                    <span>{language === 'ml' ? 'പൗരൻ ജി.പി.എസ് സഹിതം രേഖപ്പെടുത്തി' : 'Citizen verified & recorded via GPS'}</span>
+                  </div>
+                  {statusConfig.step >= 2 && (
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3 h-3 text-[#16A34A]" />
+                      <span>{language === 'ml' ? 'വകുപ്പ് എഞ്ചിനീയർ പരിശോധിച്ച് ഉറപ്പുവരുത്തി' : 'Inspected & acknowledged by Department Official'}</span>
+                    </div>
+                  )}
+                  {statusConfig.step >= 3 && (
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3 h-3 text-blue-600 animate-spin" />
+                      <span className="text-blue-700 font-semibold">{language === 'ml' ? 'കരാറുകാരൻ സ്ഥലത്തു പ്രവൃത്തി ആരംഭിച്ചു' : 'Field repair team assigned and work in progress'}</span>
+                    </div>
+                  )}
+                  {statusConfig.step === 4 && (
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span className="text-emerald-700 font-bold">{language === 'ml' ? 'പ്രവൃത്തി പൂർത്തിയാക്കി വാർഡ് ഇൻസ്പെക്ഷൻ നടത്തി' : 'Site inspection approved & officially resolved'}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

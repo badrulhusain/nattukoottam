@@ -60,6 +60,7 @@ export const DiscoverMapView: React.FC = () => {
     { id: 'WATER_SANITATION', label: language === 'ml' ? 'കുടിവെള്ളം' : 'Water' },
     { id: 'ELECTRICITY', label: language === 'ml' ? 'വൈദ്യുതി' : 'Electricity' },
     { id: 'WASTE_MANAGEMENT', label: language === 'ml' ? 'മാലിന്യം' : 'Waste' },
+    { id: 'PUBLIC_HEALTH', label: language === 'ml' ? 'പൊതുജനാരോഗ്യം' : 'Health' },
   ];
 
   // Filter posts that have valid geo-coordinates

@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAppStore } from '../lib/store';
 import { getT } from '../lib/translations';
 import { StoriesBar } from '../components/feed/StoriesBar';
 import { PostComposer } from '../components/feed/PostComposer';
 import { PostCard } from '../components/feed/PostCard';
-import { Flame, Sparkles, Plus } from 'lucide-react';
+import { CivicAssistantModal } from '../components/ai/CivicAssistantModal';
+import { Flame, Sparkles, Plus, Bot } from 'lucide-react';
 
 export default function HomePage() {
   const { posts, language, setIsCreateModalOpen, isAuthenticated, setIsAuthModalOpen } = useAppStore();
   const t = getT(language);
+  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
 
   // Trending & Latest Posts for Home Page (sorted by high community engagement & recent priority)
   const trendingLatestPosts = useMemo(() => {
@@ -27,7 +29,45 @@ export default function HomePage() {
       <StoriesBar />
 
       {/* Quick Post Composer Input */}
-      {/* <PostComposer /> */}
+      <PostComposer />
+
+      {/* AI Civic Assistant ("Ask About Your Area") Trigger Card */}
+      <div className="p-3.5 bg-gradient-to-r from-[#17231D] via-[#1E3027] to-[#14532D] rounded-2xl text-white shadow-xs border border-white/10 flex items-center justify-between gap-3 animate-in fade-in">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-[#16A34A] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+            <Sparkles className="w-5 h-5 text-white animate-pulse" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-xs text-white">
+                {language === 'ml' ? 'AI പൗരസഹായിയോട് ചോദിക്കൂ' : 'Ask AI Civic Assistant'}
+              </span>
+              <span className="text-[9px] bg-white/20 text-emerald-200 px-1.5 py-0.2 rounded font-mono">
+                Groq RAG
+              </span>
+            </div>
+            <p className="text-[11px] text-white/80 truncate">
+              {language === 'ml'
+                ? 'വാർഡിലെ റോഡ് പണികൾ, കുടിവെള്ളം, കറന്റ് തടസ്സങ്ങൾ എന്നിവയെക്കുറിച്ച് ചോദിക്കാം'
+                : 'Ask about local road works, pipe bursts, power outages & projects'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsAiAssistantOpen(true)}
+          className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-[#17231D] font-extrabold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer flex-shrink-0"
+        >
+          {language === 'ml' ? 'ചോദിക്കുക' : 'Ask AI'}
+        </button>
+      </div>
+
+      {/* AI Civic Assistant Modal */}
+      <CivicAssistantModal
+        isOpen={isAiAssistantOpen}
+        onClose={() => setIsAiAssistantOpen(false)}
+      />
 
       {/* Trending & Latest Issues Header */}
       {/* <div className="flex items-center justify-between px-1 pt-1">

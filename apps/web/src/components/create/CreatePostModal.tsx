@@ -23,6 +23,9 @@ import {
   Pause,
   Square,
   Trash2,
+  ShieldCheck,
+  AlertTriangle,
+  ThumbsUp,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
@@ -56,6 +59,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
     addPost,
     currentUser,
     setIsAuthModalOpen,
+    toggleSupport,
   } = useAppStore();
   const t = getT(language);
 
@@ -65,6 +69,13 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
   const [urgency, setUrgency] = useState<UrgencyLevel>('HIGH');
   const [mediaUrl, setMediaUrl] = useState('');
   const [postType, setPostType] = useState<'grievance' | 'community'>('grievance');
+
+  // Nearby Duplicate Prevention State
+  const [nearbyDuplicates, setNearbyDuplicates] = useState<
+    { id: string; title: string; distanceMeters: number; supportsCount: number }[]
+  >([]);
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  const [dismissedDuplicates, setDismissedDuplicates] = useState(false);
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false);
@@ -96,6 +107,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
   const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
   const [includeVoiceInPhoto, setIncludeVoiceInPhoto] = useState(true);
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -119,6 +131,41 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
       setGpsStatus('success');
     }
   }, [userLocation]);
+
+  // Spatial duplicate detection when coords or category change
+  useEffect(() => {
+    if (!coords || typeof coords.lat !== 'number' || typeof coords.lng !== 'number') {
+      setNearbyDuplicates([]);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchDuplicates = async () => {
+      try {
+        setIsCheckingDuplicates(true);
+        const res = await fetch(
+          `/api/issues/nearby/duplicates?lat=${coords.lat}&lng=${coords.lng}&radius=200&category=${category}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && Array.isArray(data)) {
+            setNearbyDuplicates(data);
+            setDismissedDuplicates(false);
+          }
+        }
+      } catch (err) {
+        console.warn('Duplicate check failed:', err);
+      } finally {
+        if (isMounted) setIsCheckingDuplicates(false);
+      }
+    };
+
+    const timer = setTimeout(fetchDuplicates, 450);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [coords?.lat, coords?.lng, category]);
 
   if (!isCreateModalOpen) return null;
 
@@ -409,6 +456,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
           longitude: finalCoords.lng,
           evidenceUrls: mediaUrl ? [mediaUrl] : [],
           voiceAudioUrl: finalVoiceUrl || undefined,
+          isAnonymous,
         });
         createdId = res?.id;
       } else {
@@ -422,19 +470,28 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
           mediaUrls: mediaUrl ? [mediaUrl] : [],
           language: language || 'ml',
           voiceAudioUrl: finalVoiceUrl || undefined,
+          isAnonymous,
         });
         createdId = res?.id;
       }
 
       addPost({
         id: createdId || `post_${Date.now()}`,
-        author: {
-          id: currentUser.id,
-          fullName: currentUser.fullName,
-          username: currentUser.username,
-          avatarUrl: currentUser.avatarUrl,
-          locality: selectedLocality,
-        },
+        author: isAnonymous
+          ? {
+              id: 'anonymous',
+              fullName: language === 'ml' ? `വാർഡ് നിവാസി (${selectedLocality})` : `Ward Resident (${selectedLocality})`,
+              username: 'ward_resident',
+              avatarUrl: '',
+              locality: selectedLocality,
+            }
+          : {
+              id: currentUser.id,
+              fullName: currentUser.fullName,
+              username: currentUser.username,
+              avatarUrl: currentUser.avatarUrl,
+              locality: selectedLocality,
+            },
         content,
         category,
         urgency,
@@ -445,7 +502,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
         longitude: finalCoords.lng,
         accuracy: finalCoords.accuracy,
         mediaUrls: mediaUrl ? [mediaUrl] : [],
-        isInfrastructureIssue: postType === 'grievance',
+        isInfrastructureIssue: postType === 'grievance' || Boolean(category),
+        status: postType === 'grievance' ? 'UNDER_REVIEW' : (category ? 'REPORTED' : undefined),
         voiceAudioUrl: finalVoiceUrl || undefined,
         hasVoiceInPhoto: Boolean(finalVoiceUrl && mediaUrl),
       });
@@ -679,31 +737,29 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
           </div>
 
           {/* Urgency Selector */}
-          {postType === 'grievance' && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#17251D]">{t.create.urgency}</label>
-              <div className="grid grid-cols-4 gap-2">
-                {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const).map((lvl) => (
-                  <button
-                    type="button"
-                    key={lvl}
-                    onClick={() => setUrgency(lvl)}
-                    className={`py-1.5 text-xs font-bold rounded-xl border transition-all active-press ${
-                      urgency === lvl
-                        ? lvl === 'CRITICAL'
-                          ? 'bg-red-50 text-red-700 border-red-300 shadow-xs'
-                          : lvl === 'HIGH'
-                          ? 'bg-orange-50 text-orange-700 border-orange-300 shadow-xs'
-                          : 'bg-[#EAF7EF] text-[#16A34A] border-[#D1EBD9] shadow-xs'
-                        : 'bg-[#F8FAF8] text-[#718078] border-[#E4EBE6] hover:bg-white'
-                    }`}
-                  >
-                    {t.urgency[lvl]}
-                  </button>
-                ))}
-              </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[#17251D]">{t.create.urgency}</label>
+            <div className="grid grid-cols-4 gap-2">
+              {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const).map((lvl) => (
+                <button
+                  type="button"
+                  key={lvl}
+                  onClick={() => setUrgency(lvl)}
+                  className={`py-1.5 text-xs font-bold rounded-xl border transition-all active-press ${
+                    urgency === lvl
+                      ? lvl === 'CRITICAL'
+                        ? 'bg-red-50 text-red-700 border-red-300 shadow-xs'
+                        : lvl === 'HIGH'
+                        ? 'bg-orange-50 text-orange-700 border-orange-300 shadow-xs'
+                        : 'bg-[#EAF7EF] text-[#16A34A] border-[#D1EBD9] shadow-xs'
+                      : 'bg-[#F8FAF8] text-[#718078] border-[#E4EBE6] hover:bg-white'
+                  }`}
+                >
+                  {t.urgency[lvl]}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
           {/* Location & GPS Panel */}
           <div className="space-y-2 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6] p-3">
@@ -844,6 +900,58 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
             )}
           </div>
 
+          {/* Spatial Duplicate Warning Banner */}
+          {postType === 'grievance' && nearbyDuplicates.length > 0 && !dismissedDuplicates && (
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-3 text-xs space-y-2 animate-in fade-in duration-200 shadow-2xs">
+              <div className="flex items-center justify-between text-amber-900 font-bold">
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 animate-pulse" />
+                  <span>
+                    {language === 'ml'
+                      ? 'സമീപത്ത് സമാനമായ പ്രശ്നം കണ്ടെത്തി'
+                      : 'Nearby Complaint Already Reported'}
+                  </span>
+                </div>
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
+                  {nearbyDuplicates[0].distanceMeters}m {language === 'ml' ? 'അകലെ' : 'away'}
+                </span>
+              </div>
+
+              <p className="text-zinc-800 font-semibold line-clamp-2">
+                &ldquo;{nearbyDuplicates[0].title}&rdquo;
+              </p>
+
+              <p className="text-[11px] text-zinc-600 leading-relaxed">
+                {language === 'ml'
+                  ? `ഇരട്ടിപ്പ് റിപ്പോർട്ടുകൾ ഒഴിവാക്കാൻ ഈ പരാതിയെ പിന്തുണയ്ക്കുക (${nearbyDuplicates[0].supportsCount} പിന്തുണക്കാർ). ഇത് അധികാരികളുടെ മുൻഗണന വർദ്ധിപ്പിക്കും.`
+                  : `Avoid filing duplicate reports by supporting this existing complaint (${nearbyDuplicates[0].supportsCount} citizens supported). This accelerates official resolution.`}
+              </p>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggleSupport(nearbyDuplicates[0].id);
+                    setIsCreateModalOpen(false);
+                  }}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <ThumbsUp className="w-3.5 h-3.5 fill-current" />
+                  <span>
+                    {language === 'ml' ? 'ഇതിനെ പിന്തുണയ്ക്കുക (+1)' : 'Support Existing (+1)'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDismissedDuplicates(true)}
+                  className="bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 font-semibold py-1.5 px-3 rounded-lg transition-colors cursor-pointer text-[11px]"
+                >
+                  <span>{language === 'ml' ? 'പുതിയത് നൽകുക' : 'Create Anyway'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Media Attachments - Cloudinary Functional Upload */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-[#17251D]">
@@ -971,6 +1079,29 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
               </div>
             )}
           </div>
+
+          {/* Anonymous-but-verified Posting Toggle */}
+          <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6] hover:border-zinc-300 transition-colors cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded text-[#16A34A] focus:ring-[#16A34A] accent-[#16A34A] cursor-pointer"
+            />
+            <div className="text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-[#17231D]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" />
+                <span>
+                  {language === 'ml' ? 'അജ്ഞാതമായി പങ്കുവെക്കുക (Anonymous Mode)' : 'Post Anonymously (Whistleblower Mode)'}
+                </span>
+              </div>
+              <p className="text-[10.5px] text-[#718078] mt-0.5 leading-snug">
+                {language === 'ml'
+                  ? 'നിങ്ങളുടെ അക്കൗണ്ട് പരിശോധിക്കപ്പെട്ടതാണ്, എന്നാൽ പൊതുവേദിയിൽ നിങ്ങളുടെ പേരിന് പകരം "വാർഡ് നിവാസി" എന്ന് മാത്രമേ കാണിക്കൂ.'
+                  : 'Your identity is verified for spam prevention, but other citizens & officials will only see "Ward Resident".'}
+              </p>
+            </div>
+          </label>
 
           {/* Submit CTA */}
           <div className="pt-2">

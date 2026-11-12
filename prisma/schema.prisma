@@ -83,6 +83,7 @@ enum NotificationType {
   OFFICIAL_ASSIGNED
   PROJECT_CONFLICT_ALERT
   COORDINATION_REQUEST
+  ISSUE_ESCALATED
 }
 
 enum DiscussionRoomType {
@@ -109,6 +110,8 @@ model User {
   preferredLang    String       @default("ml") // 'ml' | 'en'
   isActive         Boolean      @default(true)
   isVerified       Boolean      @default(false)
+  karmaPoints      Int          @default(0)
+  badges           String[]     @default([])
   refreshTokenHash String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -165,6 +168,7 @@ model Post {
   language     String        @default("ml")
   viewCount    Int           @default(0)
   voiceAudioUrl String?
+  isAnonymous  Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -240,6 +244,7 @@ model Issue {
   rootCauseClusterId  String?        // ID linking correlated incidents
   mergedIntoIssueId   String?        // Target issue ID if duplicate
   voiceAudioUrl       String?
+  isAnonymous         Boolean        @default(false)
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 

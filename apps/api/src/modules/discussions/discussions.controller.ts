@@ -9,7 +9,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Sse,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DiscussionsService } from './discussions.service';
 import {
@@ -140,6 +142,13 @@ export class DiscussionsController {
     @Body() dto: SendMessageDto
   ) {
     return this.discussionsService.sendMessage(id, userId, dto);
+  }
+
+  @Public()
+  @Sse(':id/stream')
+  @ApiOperation({ summary: 'Real-time SSE event stream for new discussion messages' })
+  streamMessages(@Param('id') id: string): Observable<any> {
+    return this.discussionsService.getMessageStream(id);
   }
 }
 

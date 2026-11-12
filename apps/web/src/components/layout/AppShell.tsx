@@ -169,9 +169,10 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           },
           content: p.content,
           category: p.category,
-          urgency: p.urgency,
+          urgency: p.urgency || (p.category ? 'MEDIUM' : undefined),
           locality: p.locality,
           district: p.district,
+          address: p.address || `${p.locality}, ${p.district}`,
           latitude: p.latitude,
           longitude: p.longitude,
           mediaUrls: p.media && p.media.length > 0 ? p.media.map((m: any) => m.mediaUrl) : (p.mediaUrls || []),
@@ -183,7 +184,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           sharesCount: 0,
           createdAt: formatRelativeTime(p.createdAt),
           rawCreatedAt: p.createdAt,
-          isInfrastructureIssue: false,
+          isInfrastructureIssue: Boolean(p.isInfrastructureIssue || p.category),
+          status: p.status || (p.category ? 'REPORTED' : undefined),
+          voiceAudioUrl: p.voiceAudioUrl || undefined,
+          department: p.department,
+          resolutionNotes: p.resolutionNotes,
         }));
 
         const mappedIssues: (Post & { rawCreatedAt?: string })[] = issueItems.map((issue: any) => ({
@@ -217,6 +222,10 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           rawCreatedAt: issue.createdAt,
           isInfrastructureIssue: true,
           status: issue.status || 'UNDER_REVIEW',
+          voiceAudioUrl: issue.voiceAudioUrl || undefined,
+          department: issue.department,
+          resolutionNotes: issue.resolutionNotes,
+          history: issue.history || [],
         }));
 
         const allItems = [...mappedIssues, ...mappedPosts];

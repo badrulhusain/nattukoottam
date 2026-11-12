@@ -54,6 +54,10 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   voiceAudioUrl?: string;
+
+  @ApiPropertyOptional({ example: false, default: false })
+  @IsOptional()
+  isAnonymous?: boolean;
 }
 
 export class QueryPostsDto extends PaginationParamsDto {
