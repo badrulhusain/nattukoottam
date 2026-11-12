@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   ArrowLeft,
   Users,
@@ -332,12 +333,17 @@ export const DiscussionRoomView: React.FC<DiscussionRoomViewProps> = ({ roomId, 
                 className={`flex items-end gap-2.5 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
                 {!isMe && (
-                  <UserAvatar
-                    src={msg.sender?.avatarUrl}
-                    name={msg.sender?.fullName || 'Citizen'}
-                    size="xs"
-                    className="flex-shrink-0 mb-1"
-                  />
+                  <Link
+                    href={`/profile?id=${encodeURIComponent(msg.senderId)}&username=${encodeURIComponent((msg.sender?.fullName || 'citizen').toLowerCase().replace(/\s+/g, '_'))}`}
+                    className="flex-shrink-0 mb-1 hover:opacity-85 transition-opacity"
+                    title={`View ${msg.sender?.fullName || 'Citizen'}'s profile`}
+                  >
+                    <UserAvatar
+                      src={msg.sender?.avatarUrl}
+                      name={msg.sender?.fullName || 'Citizen'}
+                      size="xs"
+                    />
+                  </Link>
                 )}
 
                 <div
@@ -349,9 +355,14 @@ export const DiscussionRoomView: React.FC<DiscussionRoomViewProps> = ({ roomId, 
                 >
                   {!isMe && (
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#16A34A]">
-                      <span>{msg.sender?.fullName}</span>
+                      <Link
+                        href={`/profile?id=${encodeURIComponent(msg.senderId)}&username=${encodeURIComponent((msg.sender?.fullName || 'citizen').toLowerCase().replace(/\s+/g, '_'))}`}
+                        className="hover:underline truncate"
+                      >
+                        {msg.sender?.fullName}
+                      </Link>
                       {msg.sender?.locality && (
-                        <span className="text-[9px] text-[#718078] font-normal">
+                        <span className="text-[9px] text-[#718078] font-normal truncate">
                           · {msg.sender.locality}
                         </span>
                       )}
@@ -499,21 +510,25 @@ export const DiscussionRoomView: React.FC<DiscussionRoomViewProps> = ({ roomId, 
                   key={m.id}
                   className="flex items-center justify-between p-2 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6]"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <Link
+                    href={`/profile?id=${encodeURIComponent(m.user?.id || m.userId)}&username=${encodeURIComponent((m.user?.fullName || 'citizen').toLowerCase().replace(/\s+/g, '_'))}`}
+                    className="flex items-center gap-2.5 min-w-0 hover:opacity-85 transition-opacity"
+                    title={`View ${m.user?.fullName || 'Citizen'}'s profile`}
+                  >
                     <UserAvatar
                       src={m.user?.avatarUrl}
                       name={m.user?.fullName || 'Citizen'}
                       size="xs"
                     />
                     <div className="truncate">
-                      <div className="text-xs font-bold text-[#17231D] truncate">
+                      <div className="text-xs font-bold text-[#17231D] hover:text-[#16A34A] transition-colors truncate">
                         {m.user?.fullName}
                       </div>
                       <div className="text-[10px] text-[#718078] truncate">
                         {m.user?.locality || 'Kerala'}
                       </div>
                     </div>
-                  </div>
+                  </Link>
                   {m.role === 'ADMIN' && (
                     <span className="text-[9px] font-bold text-[#16A34A] bg-[#EAF7EF] border border-[#D1EBD9] px-2 py-0.5 rounded-full">
                       Admin

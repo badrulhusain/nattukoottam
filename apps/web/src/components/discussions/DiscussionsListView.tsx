@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   MessageSquare,
   Users,
@@ -25,12 +26,21 @@ import { DiscussionRoomView } from './DiscussionRoomView';
 import { UserAvatar } from '../ui/UserAvatar';
 
 export const DiscussionsListView: React.FC = () => {
+  const searchParams = useSearchParams();
+  const roomParam = searchParams.get('room');
+
   const { language, currentLocality, isAuthenticated, setIsAuthModalOpen } = useAppStore();
   const t = getT(language);
 
   const [rooms, setRooms] = useState<DiscussionRoom[]>([]);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(roomParam || null);
   const [filterType, setFilterType] = useState<'ALL' | DiscussionRoomType>('ALL');
+
+  useEffect(() => {
+    if (roomParam) {
+      setSelectedRoomId(roomParam);
+    }
+  }, [roomParam]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

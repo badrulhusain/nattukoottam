@@ -21,6 +21,7 @@ export class IssuesService {
         latitude: dto.latitude,
         longitude: dto.longitude,
         reporterId: userId,
+        voiceAudioUrl: dto.voiceAudioUrl,
         status: 'REPORTED',
         evidences: dto.evidenceUrls && dto.evidenceUrls.length > 0
           ? {
@@ -78,6 +79,9 @@ export class IssuesService {
     }
     if (query.urgency) {
       where.urgency = query.urgency;
+    }
+    if (query.assignedDeptId) {
+      where.assignedDeptId = query.assignedDeptId;
     }
 
     const [total, issues] = await Promise.all([

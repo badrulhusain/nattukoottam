@@ -49,6 +49,11 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   language?: string = 'ml';
+
+  @ApiPropertyOptional({ example: 'https://res.cloudinary.com/.../voice.webm' })
+  @IsString()
+  @IsOptional()
+  voiceAudioUrl?: string;
 }
 
 export class QueryPostsDto extends PaginationParamsDto {
@@ -66,5 +71,10 @@ export class QueryPostsDto extends PaginationParamsDto {
   @IsString()
   @IsOptional()
   feed?: 'forYou' | 'nearby' | 'following' | 'trending' = 'forYou';
+
+  @ApiPropertyOptional({ example: 'user-uuid-1234', description: 'Filter posts by specific author' })
+  @IsString()
+  @IsOptional()
+  authorId?: string;
 }
 

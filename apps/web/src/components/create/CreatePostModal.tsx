@@ -16,6 +16,13 @@ import {
   Layers,
   Send,
   UploadCloud,
+  Mic,
+  MicOff,
+  Volume2,
+  Play,
+  Pause,
+  Square,
+  Trash2,
 } from 'lucide-react';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
@@ -26,7 +33,12 @@ import {
   EXTENDED_KERALA_LOCALITIES,
   KERALA_DISTRICTS,
 } from '../../lib/geolocation';
-import { createLivePostApi, createLiveIssueApi, uploadMediaApi } from '../../lib/api';
+import {
+  createLivePostApi,
+  createLiveIssueApi,
+  uploadMediaApi,
+  transcribeVoiceAudioApi,
+} from '../../lib/api';
 
 interface CreatePostModalProps {
   autoDetectGps?: boolean;
@@ -73,6 +85,23 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [isManualEditOpen, setIsManualEditOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Voice Recording & Groq Transcription State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptionStatus, setTranscriptionStatus] = useState<string | null>(null);
+  const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
+  const [includeVoiceInPhoto, setIncludeVoiceInPhoto] = useState(true);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<any>(null);
+  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
+  const speechRecognitionRef = useRef<any>(null);
 
   // Sync with userLocation if already detected
   useEffect(() => {
@@ -198,6 +227,130 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
     }
   };
 
+  const startVoiceRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        setRecordedAudioBlob(blob);
+        const localUrl = URL.createObjectURL(blob);
+        setAudioPreviewUrl(localUrl);
+
+        // Transcribe with Groq AI Whisper
+        setIsTranscribing(true);
+        setTranscriptionStatus(
+          language === 'ml'
+            ? 'Groq AI ശബ്ദം അക്ഷരങ്ങളാക്കുന്നു...'
+            : 'Groq AI transcribing voice to text...'
+        );
+
+        try {
+          const res = await transcribeVoiceAudioApi(blob, language || 'ml', true);
+          if (res.text) {
+            setContent((prev) => (prev ? `${prev}\n${res.text}` : res.text));
+            setTranscriptionStatus(
+              language === 'ml'
+                ? 'വോയ്‌സ് വിജയകരമായി എഴുതിച്ചേർത്തു!'
+                : 'Voice transcribed successfully!'
+            );
+          } else if (res.warning) {
+            setTranscriptionStatus(
+              language === 'ml'
+                ? 'വോയ്‌സ് റെക്കോർഡ് ചെയ്തു (Groq API കീ സജ്ജീകരിക്കുക).'
+                : 'Voice recorded (Set GROQ_API_KEY in .env for text).'
+            );
+          }
+          if (res.audioUrl) {
+            setVoiceAudioUrl(res.audioUrl);
+          }
+        } catch (err: any) {
+          console.warn('Transcription error:', err);
+          setTranscriptionStatus(language === 'ml' ? 'വോയ്‌സ് സൂക്ഷിച്ചു' : 'Audio recorded');
+        } finally {
+          setIsTranscribing(false);
+          setTimeout(() => setTranscriptionStatus(null), 4000);
+        }
+
+        // Stop all tracks
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start(250);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.error('Microphone access failed:', err);
+      alert(
+        language === 'ml'
+          ? 'മൈക്രോഫോൺ അനുമതി ലഭ്യമായില്ല. ദയവായി ബ്രൗസർ പെർമിഷൻ അനുവദിക്കുക.'
+          : 'Microphone access denied. Please grant microphone permissions in your browser.'
+      );
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+    }
+    setIsRecording(false);
+  };
+
+  const cancelVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+    }
+    setIsRecording(false);
+    setRecordedAudioBlob(null);
+    setAudioPreviewUrl(null);
+    setVoiceAudioUrl(null);
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+    }
+    setIsPlayingPreview(false);
+  };
+
+  const togglePreviewPlayback = () => {
+    if (!audioPreviewRef.current && audioPreviewUrl) {
+      audioPreviewRef.current = new Audio(audioPreviewUrl);
+      audioPreviewRef.current.onended = () => setIsPlayingPreview(false);
+    }
+    if (audioPreviewRef.current) {
+      if (isPlayingPreview) {
+        audioPreviewRef.current.pause();
+        setIsPlayingPreview(false);
+      } else {
+        audioPreviewRef.current.play();
+        setIsPlayingPreview(true);
+      }
+    }
+  };
+
+  const formatVoiceSeconds = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const remaining = sec % 60;
+    return `${mins}:${remaining < 10 ? '0' : ''}${remaining}`;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
@@ -223,6 +376,22 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
     try {
       let createdId: string | undefined;
 
+      // Handle voice attachment if approved by user
+      let finalVoiceUrl = includeVoiceInPhoto ? voiceAudioUrl : undefined;
+      if (includeVoiceInPhoto && !finalVoiceUrl && recordedAudioBlob) {
+        try {
+          const file = new File([recordedAudioBlob], `voice_${Date.now()}.webm`, {
+            type: recordedAudioBlob.type || 'audio/webm',
+          });
+          const uploaded = await uploadMediaApi(file);
+          if (uploaded?.url) {
+            finalVoiceUrl = uploaded.url;
+          }
+        } catch (e) {
+          console.warn('Voice upload error:', e);
+        }
+      }
+
       if (postType === 'grievance') {
         const title =
           content.split('\n')[0].slice(0, 80).trim() ||
@@ -239,6 +408,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
           latitude: finalCoords.lat,
           longitude: finalCoords.lng,
           evidenceUrls: mediaUrl ? [mediaUrl] : [],
+          voiceAudioUrl: finalVoiceUrl || undefined,
         });
         createdId = res?.id;
       } else {
@@ -251,6 +421,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
           longitude: finalCoords.lng,
           mediaUrls: mediaUrl ? [mediaUrl] : [],
           language: language || 'ml',
+          voiceAudioUrl: finalVoiceUrl || undefined,
         });
         createdId = res?.id;
       }
@@ -275,10 +446,15 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
         accuracy: finalCoords.accuracy,
         mediaUrls: mediaUrl ? [mediaUrl] : [],
         isInfrastructureIssue: postType === 'grievance',
+        voiceAudioUrl: finalVoiceUrl || undefined,
+        hasVoiceInPhoto: Boolean(finalVoiceUrl && mediaUrl),
       });
 
       setContent('');
       setMediaUrl('');
+      setRecordedAudioBlob(null);
+      setAudioPreviewUrl(null);
+      setVoiceAudioUrl(null);
       setIsCreateModalOpen(false);
     } catch (err: any) {
       console.error('Post submission error:', err);
@@ -346,14 +522,142 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = () => {
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Text Area */}
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder={t.create.inputPlaceholder}
-            rows={3}
-            required
-            className="w-full p-3.5 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6] text-xs text-[#17251D] placeholder-[#718078] outline-none focus:border-[#16A34A] focus:bg-white transition-all resize-none"
-          />
+          <div className="space-y-2">
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder={t.create.inputPlaceholder}
+              rows={3}
+              required
+              className="w-full p-3.5 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6] text-xs text-[#17251D] placeholder-[#718078] outline-none focus:border-[#16A34A] focus:bg-white transition-all resize-none"
+            />
+
+            {/* Voice Input with Groq Whisper AI */}
+            <div className="space-y-2">
+              {!isRecording && !isTranscribing ? (
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={startVoiceRecording}
+                    className="py-1.5 px-3 rounded-xl bg-[#EAF7EF] hover:bg-[#d8f2de] border border-[#D1EBD9] text-[#16A34A] text-xs font-bold transition-all flex items-center gap-2 active-press cursor-pointer"
+                  >
+                    <Mic className="w-3.5 h-3.5 stroke-[2.2]" />
+                    <span>{t.create.recordVoice}</span>
+                    <span className="bg-[#16A34A] text-white text-[9px] px-1.5 py-0.2 rounded-md font-extrabold uppercase">
+                      Groq AI
+                    </span>
+                  </button>
+
+                  <span className="text-[11px] text-[#718078]">
+                    {language === 'ml'
+                      ? 'മലയാളത്തിലോ ഇംഗ്ലീഷിലോ സംസാരിക്കാം'
+                      : 'Speak in Malayalam or English'}
+                  </span>
+                </div>
+              ) : isRecording ? (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between gap-3 animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
+                    <span className="text-xs font-bold text-red-700">
+                      {t.create.recording} ({formatVoiceSeconds(recordingSeconds)})
+                    </span>
+                    <span className="text-[11px] text-red-600 hidden sm:inline">
+                      {t.create.speakNow}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={stopVoiceRecording}
+                      className="py-1 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active-press"
+                    >
+                      <Square className="w-3 h-3 fill-current" />
+                      <span>{t.create.stopRecording}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelVoiceRecording}
+                      className="p-1 rounded-lg text-red-600 hover:bg-red-100 transition-colors"
+                      title="Cancel"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-[#EAF7EF] border border-[#D1EBD9] flex items-center gap-2 text-xs text-[#16A34A] font-bold">
+                  <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                  <span>{t.create.transcribing}</span>
+                </div>
+              )}
+
+              {transcriptionStatus && !isTranscribing && (
+                <div className="text-[11px] text-[#16A34A] font-medium flex items-center gap-1.5 bg-[#EAF7EF]/60 px-2.5 py-1 rounded-lg border border-[#D1EBD9]">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{transcriptionStatus}</span>
+                </div>
+              )}
+
+              {/* Voice Attachment & Photo Background Approval Card */}
+              {audioPreviewUrl && !isRecording && (
+                <div className="rounded-xl border border-[#D1EBD9] bg-[#EAF7EF]/70 p-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="w-4 h-4 text-[#16A34A]" />
+                      <span className="text-xs font-bold text-[#17251D]">
+                        {t.create.voiceAttached} ({formatVoiceSeconds(recordingSeconds || 10)})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={togglePreviewPlayback}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-[#D1EBD9] text-[#16A34A] font-bold text-xs flex items-center gap-1.5 shadow-2xs hover:bg-[#F8FAF8] active-press cursor-pointer"
+                      >
+                        {isPlayingPreview ? (
+                          <Pause className="w-3.5 h-3.5 fill-current" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        )}
+                        <span>{isPlayingPreview ? 'Pause' : 'Play Audio'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={cancelVoiceRecording}
+                        className="p-1 rounded-lg text-[#718078] hover:text-red-600 transition-colors cursor-pointer"
+                        title="Delete recording"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Approval Checkbox: Play voice in background of photo */}
+                  <label className="flex items-start gap-2.5 cursor-pointer pt-2 border-t border-[#D1EBD9]/60">
+                    <input
+                      type="checkbox"
+                      checked={includeVoiceInPhoto}
+                      onChange={(e) => setIncludeVoiceInPhoto(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded text-[#16A34A] focus:ring-[#16A34A] accent-[#16A34A] cursor-pointer"
+                    />
+                    <div className="text-[11.5px] leading-snug">
+                      <span className="font-bold text-[#17251D]">
+                        {t.create.playVoiceInBg}
+                      </span>
+                      <p className="text-[#718078] text-[10.5px] mt-0.5">
+                        {language === 'ml'
+                          ? 'ഈ പോസ്റ്റ് കാണുന്ന ഉദ്യോഗസ്ഥർക്കും നാട്ടുകാർക്കും ഫോട്ടോയുടെ പശ്ചാത്തലത്തിൽ നിങ്ങളുടെ ശബ്ദസന്ദേശം കേൾക്കാം.'
+                          : 'Citizens and officials viewing this post will hear your recorded voice in the photo background.'}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Category Selector */}
           <div className="space-y-1">

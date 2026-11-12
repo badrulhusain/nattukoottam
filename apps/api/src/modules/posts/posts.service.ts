@@ -18,6 +18,7 @@ export class PostsService {
         latitude: dto.latitude,
         longitude: dto.longitude,
         language: dto.language || 'ml',
+        voiceAudioUrl: dto.voiceAudioUrl,
         media: dto.mediaUrls && dto.mediaUrls.length > 0
           ? {
               create: dto.mediaUrls.map((url) => ({
@@ -57,6 +58,9 @@ export class PostsService {
     }
     if (query.category) {
       where.category = query.category;
+    }
+    if (query.authorId) {
+      where.authorId = query.authorId;
     }
 
     const [total, posts] = await Promise.all([

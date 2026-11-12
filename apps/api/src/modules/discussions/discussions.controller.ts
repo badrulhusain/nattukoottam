@@ -53,6 +53,20 @@ export class DiscussionsController {
     return this.discussionsService.create(userId, dto);
   }
 
+  @Post('direct/:targetUserId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('bearer-jwt')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get or create a 1-on-1 direct message conversation with another citizen',
+  })
+  async getOrCreateDirect(
+    @CurrentUser('id') userId: string,
+    @Param('targetUserId') targetUserId: string
+  ) {
+    return this.discussionsService.getOrCreateDirectRoom(userId, targetUserId);
+  }
+
   @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Get details of a discussion channel or group' })

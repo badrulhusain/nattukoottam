@@ -72,6 +72,8 @@ export interface Post {
   createdAt: string;
   isInfrastructureIssue?: boolean;
   status?: IssueStatus;
+  voiceAudioUrl?: string;
+  hasVoiceInPhoto?: boolean;
 }
 
 export interface InfrastructureIssue {

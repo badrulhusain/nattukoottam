@@ -157,6 +157,9 @@ export class ProjectsService {
     if (query.status) {
       where.status = query.status;
     }
+    if (query.departmentId) {
+      where.departmentId = query.departmentId;
+    }
 
     const [total, projects] = await Promise.all([
       this.prisma.infrastructureProject.count({ where }),

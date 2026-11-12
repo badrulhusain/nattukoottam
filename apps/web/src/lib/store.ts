@@ -49,6 +49,29 @@ interface AppState {
   isAddStoryOpen: boolean;
   setIsAddStoryOpen: (open: boolean) => void;
   addStory: (newStory: { id?: string; mediaUrl: string; caption?: string; locality?: string }) => void;
+
+  // Social Following State
+  followingIds: string[];
+  toggleFollowUser: (userId: string) => boolean;
+}
+
+const FOLLOWING_STORAGE_KEY = 'nattukuttam_following_users';
+
+function getInitialFollowing(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(FOLLOWING_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFollowingToStorage(ids: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(FOLLOWING_STORAGE_KEY, JSON.stringify(ids));
+  } catch {}
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -284,5 +307,20 @@ export const useAppStore = create<AppState>((set) => ({
         return post;
       }),
     })),
+
+  followingIds: getInitialFollowing(),
+  toggleFollowUser: (userId) => {
+    let newState = false;
+    set((state) => {
+      const exists = state.followingIds.includes(userId);
+      newState = !exists;
+      const updated = exists
+        ? state.followingIds.filter((id) => id !== userId)
+        : [...state.followingIds, userId];
+      saveFollowingToStorage(updated);
+      return { followingIds: updated };
+    });
+    return newState;
+  },
 }));
 

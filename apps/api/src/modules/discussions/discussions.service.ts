@@ -11,7 +11,8 @@ import {
   AddMemberDto,
   QueryDiscussionsDto,
 } from './dto/create-discussion.dto';
-import { DiscussionRoomType } from '@prisma/client';
+import { DiscussionRoomType, Role } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class DiscussionsService {
@@ -142,6 +143,107 @@ export class DiscussionsService {
     }
 
     return room;
+  }
+
+  async getOrCreateDirectRoom(currentUserId: string, targetUserId: string) {
+    if (currentUserId === targetUserId) {
+      throw new BadRequestException({
+        code: 'CANNOT_CHAT_WITH_SELF',
+        message: 'Cannot start a direct message room with yourself',
+      });
+    }
+
+    // Ensure target user exists in DB
+    let target = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!target) {
+      target = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { fullName: { equals: targetUserId, mode: 'insensitive' } },
+            { email: targetUserId },
+          ],
+        },
+      });
+    }
+
+    if (!target) {
+      const cleanPhone = `+9197${Math.floor(10000000 + Math.random() * 90000000)}`;
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash('citizen123', salt);
+      target = await this.prisma.user.create({
+        data: {
+          id: targetUserId.length === 36 ? targetUserId : undefined,
+          fullName: targetUserId.replace(/[_-]/g, ' '),
+          phone: cleanPhone,
+          passwordHash,
+          district: 'Ernakulam',
+          locality: 'Kakkanad',
+          role: Role.CITIZEN,
+        },
+      });
+    }
+
+    // Check if a direct room already exists between these two users
+    const existing = await this.prisma.discussionRoom.findFirst({
+      where: {
+        type: DiscussionRoomType.DIRECT,
+        AND: [
+          { members: { some: { userId: currentUserId } } },
+          { members: { some: { userId: target.id } } },
+        ],
+      },
+      include: {
+        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
+        _count: { select: { members: true, messages: true } },
+        members: {
+          include: {
+            user: { select: { id: true, fullName: true, avatarUrl: true, locality: true, role: true } },
+          },
+        },
+      },
+    });
+
+    if (existing) {
+      return {
+        ...existing,
+        isMember: true,
+        canJoinDirectly: false,
+      };
+    }
+
+    const currentUser = await this.prisma.user.findUnique({ where: { id: currentUserId } });
+
+    const newRoom = await this.prisma.discussionRoom.create({
+      data: {
+        name: `${target.fullName}`,
+        description: `Direct conversation with ${target.fullName}`,
+        type: DiscussionRoomType.DIRECT,
+        locality: target.locality,
+        district: target.district,
+        createdById: currentUserId,
+        members: {
+          create: [
+            { userId: currentUserId, role: 'ADMIN' },
+            { userId: target.id, role: 'MEMBER', addedById: currentUserId },
+          ],
+        },
+      },
+      include: {
+        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
+        _count: { select: { members: true, messages: true } },
+        members: {
+          include: {
+            user: { select: { id: true, fullName: true, avatarUrl: true, locality: true, role: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      ...newRoom,
+      isMember: true,
+      canJoinDirectly: false,
+    };
   }
 
   async findOne(roomId: string, userId?: string) {

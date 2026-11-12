@@ -164,6 +164,7 @@ model Post {
   longitude    Float?
   language     String        @default("ml")
   viewCount    Int           @default(0)
+  voiceAudioUrl String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -238,6 +239,7 @@ model Issue {
   aiPriorityScore     Float?         // 0.0 - 100.0 computed by intelligence module
   rootCauseClusterId  String?        // ID linking correlated incidents
   mergedIntoIssueId   String?        // Target issue ID if duplicate
+  voiceAudioUrl       String?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 

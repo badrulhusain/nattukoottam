@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import {
   ChevronUp,
   MessageSquare,
@@ -16,12 +17,23 @@ import {
   Eye,
   Trash2,
   Loader2,
+  UserPlus,
+  UserCheck,
+  Volume2,
+  VolumeX,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { Post } from '../../types';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 import { UserAvatar } from '../ui/UserAvatar';
-import { toggleLikeApi, toggleSupportApi, deletePostOrIssueApi } from '../../lib/api';
+import {
+  toggleLikeApi,
+  toggleSupportApi,
+  deletePostOrIssueApi,
+  toggleFollowUserApi,
+} from '../../lib/api';
 
 interface PostCardProps {
   post: Post;
@@ -36,6 +48,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
     deletePost,
     isAuthenticated,
     setIsAuthModalOpen,
+    followingIds,
+    toggleFollowUser,
   } = useAppStore();
   const t = getT(language);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -45,6 +59,56 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [commentsList, setCommentsList] = useState<Array<{ id: string; author: string; avatar: string; text: string; time: string }>>([]);
+
+  // Background Voice Audio Playback State
+  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
+  const [voiceDuration, setVoiceDuration] = useState(0);
+  const [voiceCurrentTime, setVoiceCurrentTime] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handleToggleVoice = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (!audioRef.current && post.voiceAudioUrl) {
+      audioRef.current = new Audio(post.voiceAudioUrl);
+      audioRef.current.onloadedmetadata = () => {
+        if (audioRef.current) setVoiceDuration(audioRef.current.duration);
+      };
+      audioRef.current.ontimeupdate = () => {
+        if (audioRef.current) setVoiceCurrentTime(audioRef.current.currentTime);
+      };
+      audioRef.current.onended = () => {
+        setIsPlayingVoice(false);
+        setVoiceCurrentTime(0);
+      };
+    }
+    if (audioRef.current) {
+      if (isPlayingVoice) {
+        audioRef.current.pause();
+        setIsPlayingVoice(false);
+      } else {
+        audioRef.current.play().catch((err) => console.warn('Audio play error:', err));
+        setIsPlayingVoice(true);
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, []);
+
+  const formatAudioTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds <= 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   const isAuthor =
     Boolean(
@@ -164,7 +228,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {/* Author & Header Metadata */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative flex-shrink-0">
+          <Link
+            href={`/profile?id=${encodeURIComponent(post.author.id || post.author.username)}&username=${encodeURIComponent(post.author.username)}`}
+            className="relative flex-shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+            title={`View ${post.author.fullName}'s profile`}
+          >
             <UserAvatar
               src={post.author.avatarUrl}
               name={post.author.fullName}
@@ -176,14 +244,63 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 <ShieldCheck className="w-2.5 h-2.5" />
               </span>
             )}
-          </div>
+          </Link>
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-bold text-sm text-[#17231D] hover:text-[#16A34A] transition-colors cursor-pointer truncate">
+              <Link
+                href={`/profile?id=${encodeURIComponent(post.author.id || post.author.username)}&username=${encodeURIComponent(post.author.username)}`}
+                className="font-bold text-sm text-[#17231D] hover:text-[#16A34A] transition-colors cursor-pointer truncate"
+              >
                 {post.author.fullName}
-              </span>
-              <span className="text-xs text-[#718078]">@{post.author.username}</span>
+              </Link>
+              <Link
+                href={`/profile?id=${encodeURIComponent(post.author.id || post.author.username)}&username=${encodeURIComponent(post.author.username)}`}
+                className="text-xs text-[#718078] hover:text-[#17231D] transition-colors"
+              >
+                @{post.author.username}
+              </Link>
+
+              {/* Quick Follow Toggle for non-self authors */}
+              {!isAuthor && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (!isAuthenticated) {
+                      setIsAuthModalOpen(true, 'login');
+                      return;
+                    }
+                    const targetId = post.author.id || post.author.username;
+                    toggleFollowUser(targetId);
+                    toggleFollowUserApi(targetId).catch(() => {});
+                  }}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors flex items-center gap-1 cursor-pointer active-press ${
+                    followingIds.includes(post.author.id) || followingIds.includes(post.author.username)
+                      ? 'bg-[#EAF7EF] text-[#16A34A] border border-[#D1EBD9]'
+                      : 'bg-[#16A34A] text-white hover:bg-[#15803D]'
+                  }`}
+                  title={
+                    followingIds.includes(post.author.id) || followingIds.includes(post.author.username)
+                      ? t.profile.following
+                      : t.profile.follow
+                  }
+                >
+                  {followingIds.includes(post.author.id) || followingIds.includes(post.author.username) ? (
+                    <>
+                      <UserCheck className="w-2.5 h-2.5" />
+                      <span>{t.profile.following}</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-2.5 h-2.5" />
+                      <span>{t.profile.follow}</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               <span className="text-xs text-[#94A39B]">·</span>
               <span className="text-xs text-[#718078]">{post.createdAt}</span>
             </div>
@@ -300,10 +417,52 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         </div>
       )}
 
-      {/* Media Carousel / Gallery */}
+      {/* Standalone Voice Note Card when post has no photo */}
+      {post.voiceAudioUrl && (!post.mediaUrls || post.mediaUrls.length === 0) && (
+        <div className="p-3 rounded-2xl bg-[#EAF7EF]/70 border border-[#D1EBD9] flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleToggleVoice}
+              className="w-9 h-9 rounded-full bg-[#16A34A] text-white flex items-center justify-center hover:bg-[#15803D] transition-colors shadow-xs active-press cursor-pointer flex-shrink-0"
+              title={isPlayingVoice ? 'Pause' : 'Play voice note'}
+            >
+              {isPlayingVoice ? (
+                <Pause className="w-4 h-4 fill-current" />
+              ) : (
+                <Play className="w-4 h-4 fill-current ml-0.5" />
+              )}
+            </button>
+            <div>
+              <div className="text-xs font-bold text-[#17231D] flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5 text-[#16A34A]" />
+                <span>{language === 'ml' ? 'വോയ്‌സ് പരാതി സന്ദേശം' : 'Voice Complaint Audio'}</span>
+              </div>
+              <div className="text-[10px] text-[#718078] font-mono mt-0.5">
+                {isPlayingVoice
+                  ? `${formatAudioTime(voiceCurrentTime)} / ${formatAudioTime(voiceDuration || 12)}`
+                  : language === 'ml'
+                  ? 'ശബ്ദം കേൾക്കാൻ ടാപ്പ് ചെയ്യുക'
+                  : 'Tap to listen to citizen voice'}
+              </div>
+            </div>
+          </div>
+
+          {isPlayingVoice && (
+            <div className="flex items-center gap-1 pr-1">
+              <span className="w-1 h-3 bg-[#16A34A] rounded-full animate-bounce" />
+              <span className="w-1 h-5 bg-[#16A34A] rounded-full animate-bounce [animation-delay:0.15s]" />
+              <span className="w-1 h-4 bg-[#16A34A] rounded-full animate-bounce [animation-delay:0.3s]" />
+              <span className="w-1 h-6 bg-[#16A34A] rounded-full animate-bounce [animation-delay:0.45s]" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Media Carousel / Gallery with Background Voice Audio Playback */}
       {post.mediaUrls && post.mediaUrls.length > 0 && (
         <div className="space-y-2 pt-1">
-          <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-[#E4EBE6] aspect-16/10">
+          <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-[#E4EBE6] aspect-16/10 group/media">
             <img
               src={post.mediaUrls[activeMediaIndex]}
               alt="Community evidence"
@@ -315,6 +474,55 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
               <span className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
                 {activeMediaIndex + 1} / {post.mediaUrls.length}
               </span>
+            )}
+
+            {/* Background Voice Audio Overlay on Photo */}
+            {post.voiceAudioUrl && (
+              <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex items-center justify-between pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={handleToggleVoice}
+                  className={`px-3 py-1.5 rounded-xl backdrop-blur-md text-xs font-bold transition-all flex items-center gap-2 shadow-lg active-press cursor-pointer ${
+                    isPlayingVoice
+                      ? 'bg-[#16A34A] text-white ring-2 ring-white/60 shadow-[#16A34A]/50'
+                      : 'bg-black/60 hover:bg-black/80 text-white border border-white/20'
+                  }`}
+                  title={
+                    isPlayingVoice
+                      ? 'Pause voice note'
+                      : 'Play citizen voice in background of photo'
+                  }
+                >
+                  {isPlayingVoice ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5 fill-current" />
+                      <span>{language === 'ml' ? 'ശബ്ദം നിർത്തുക' : 'Pause Voice'}</span>
+                      {/* Animated Soundwave Visualizer Bars */}
+                      <span className="flex items-center gap-0.5 ml-1">
+                        <span className="w-0.5 h-2.5 bg-white rounded-full animate-bounce" />
+                        <span className="w-0.5 h-4 bg-white rounded-full animate-bounce [animation-delay:0.15s]" />
+                        <span className="w-0.5 h-3 bg-white rounded-full animate-bounce [animation-delay:0.3s]" />
+                        <span className="w-0.5 h-4.5 bg-white rounded-full animate-bounce [animation-delay:0.45s]" />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{language === 'ml' ? 'ശബ്ദം കേൾക്കൂ' : 'Play Voice Note'}</span>
+                      <Play className="w-2.5 h-2.5 fill-current ml-0.5" />
+                    </>
+                  )}
+                </button>
+
+                {isPlayingVoice && (
+                  <div className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-mono text-white/95 border border-white/10 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span>
+                      {formatAudioTime(voiceCurrentTime)} / {formatAudioTime(voiceDuration || 12)}
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -417,15 +625,24 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <div className="space-y-2.5">
             {commentsList.length > 0 ? commentsList.map((comm) => (
               <div key={comm.id} className="flex items-start gap-2.5 text-xs">
-                <UserAvatar
-                  src={comm.avatar}
-                  name={comm.author}
-                  size="xs"
-                  className="flex-shrink-0"
-                />
+                <Link
+                  href={`/profile?id=${encodeURIComponent(comm.author)}&username=${encodeURIComponent(comm.author.toLowerCase().replace(/\s+/g, '_'))}`}
+                  className="flex-shrink-0 hover:opacity-90 transition-opacity"
+                >
+                  <UserAvatar
+                    src={comm.avatar}
+                    name={comm.author}
+                    size="xs"
+                  />
+                </Link>
                 <div className="flex-1 bg-[#F8FAF8] rounded-xl p-2.5 border border-[#E4EBE6]">
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-[#17231D]">{comm.author}</span>
+                    <Link
+                      href={`/profile?id=${encodeURIComponent(comm.author)}&username=${encodeURIComponent(comm.author.toLowerCase().replace(/\s+/g, '_'))}`}
+                      className="font-bold text-[#17231D] hover:text-[#16A34A] transition-colors"
+                    >
+                      {comm.author}
+                    </Link>
                     <span className="text-[10px] text-[#718078]">{comm.time}</span>
                   </div>
                   <p className="text-[#17231D] leading-relaxed">{comm.text}</p>

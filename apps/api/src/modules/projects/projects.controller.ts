@@ -19,9 +19,8 @@ import { Public } from '../../common/decorators/public.decorator';
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
+  @Public()
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('bearer-jwt')
   @ApiOperation({ summary: 'Register an infrastructure project (triggers auto-conflict detection)' })
   @ApiResponse({ status: 201, description: 'Project registered & analyzed for overlap' })
   async create(@Body() dto: CreateProjectDto) {

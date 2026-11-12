@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   X,
   ChevronLeft,
@@ -18,6 +19,7 @@ import { UserAvatar } from '../ui/UserAvatar';
 const SLIDE_DURATION_MS = 5000;
 
 export const StoryViewerModal: React.FC = () => {
+  const router = useRouter();
   const {
     stories,
     activeStoryUserIndex,
@@ -162,8 +164,19 @@ export const StoryViewerModal: React.FC = () => {
 
         {/* Top Header: Author + Time + Controls */}
         <div className="absolute top-6 inset-x-3 z-30 flex items-center justify-between text-white drop-shadow-md">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-rose-500 to-emerald-500">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeStoryViewer();
+              router.push(
+                `/profile?id=${encodeURIComponent(activeUserStory.userId || activeUserStory.userName)}&username=${encodeURIComponent(activeUserStory.userName.toLowerCase().replace(/\s+/g, '_'))}`
+              );
+            }}
+            className="flex items-center gap-2.5 hover:opacity-90 transition-opacity text-left cursor-pointer"
+            title={`View ${activeUserStory.userName}'s profile`}
+          >
+            <div className="w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-rose-500 to-emerald-500 flex-shrink-0">
               <UserAvatar
                 src={activeUserStory.userAvatar}
                 name={activeUserStory.userName}
@@ -173,7 +186,7 @@ export const StoryViewerModal: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-xs leading-none">
+                <span className="font-bold text-xs leading-none hover:underline">
                   {activeUserStory.userName}
                 </span>
                 <span className="text-[10px] text-white/70">·</span>
@@ -188,7 +201,7 @@ export const StoryViewerModal: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
+          </button>
 
           <div className="flex items-center gap-2">
             <button
