@@ -336,12 +336,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
               >
                 {post.author.fullName}
               </Link>
-              <Link
+              {/* <Link
                 href={`/profile?id=${encodeURIComponent(post.author.id || post.author.username)}&username=${encodeURIComponent(post.author.username)}`}
                 className="text-xs text-[#718078] hover:text-[#17231D] transition-colors"
               >
                 @{post.author.username}
-              </Link>
+              </Link> */}
 
               {/* Quick Follow Toggle for non-self authors */}
               {!isAuthor && (
@@ -422,7 +422,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 </>
               )}
 
-              {post.department?.name && (
+              {/* {post.department?.name && (
                 <>
                   <span className="text-[#94A39B]">·</span>
                   <span className="text-emerald-800 font-bold bg-emerald-50 px-2 py-0.2 rounded-md border border-emerald-200 text-[10px] flex items-center gap-1">
@@ -430,7 +430,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
                     <span>{post.department.name}</span>
                   </span>
                 </>
-              )}
+              )} */}
             </div>
           </div>
         </div>
@@ -448,14 +448,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
           )}
 
           {/* Urgency Badge */}
-          {post.urgency && (
+          {/* {post.urgency && (
             <span
               className={`px-2.5 py-1 rounded-full text-[10px] font-bold border flex items-center gap-1.5 ${urgencyConfig.badgeClass}`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${urgencyConfig.dotClass}`} />
               <span>{urgencyConfig.label}</span>
             </span>
-          )}
+          )} */}
 
           <div className="relative">
             <button

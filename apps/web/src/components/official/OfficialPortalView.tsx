@@ -370,145 +370,6 @@ export const OfficialPortalView: React.FC = () => {
         </div>
       </div>
 
-      {/* CORE DIFFERENTIATING FEATURE: Infrastructure Overlap Conflict Engine */}
-      {conflicts.length > 0 && (
-        <div className="space-y-3">
-          {conflicts.map((conf) => {
-            const isResolved = conf.status === 'RESOLVED';
-            return (
-              <div
-                key={conf.id}
-                className={`bg-white rounded-2xl p-5 border shadow-2xs space-y-4 ${
-                  isResolved ? 'border-[#E4EBE6]' : 'border-amber-300 bg-amber-50/20'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E4EBE6] pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className={`p-2 rounded-xl ${
-                        isResolved ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      <AlertTriangle className="w-5 h-5" />
-                    </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-sm text-[#17231D]">
-                          {t.coordination.conflictAlert}
-                        </h3>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                          {conf.distanceMeters ? `${conf.distanceMeters}m proximity` : 'Same Stretch'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#718078]">
-                        {isMl
-                          ? 'റോഡ് റീ-ടാറിംഗും പൈപ്പ് ലൈൻ കുഴിക്കലും ഒരേസമയം വരുന്നത് തടയുക'
-                          : 'Preventing repeated road excavation & destruction'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold self-start sm:self-auto ${
-                      isResolved
-                        ? 'bg-[#EAF7EF] text-[#16A34A] border border-[#D1EBD9]'
-                        : 'bg-amber-100 text-amber-800 border border-amber-300'
-                    }`}
-                  >
-                    {isResolved
-                      ? (isMl ? 'സമയക്രമം സമന്വയിപ്പിച്ചു' : 'SCHEDULES SYNCHRONIZED')
-                      : (isMl ? 'വൈരുദ്ധ്യം കണ്ടെത്തി' : 'OVERLAP DETECTED')}
-                  </span>
-                </div>
-
-                {/* Conflicting Projects Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Project A */}
-                  <div className="p-3.5 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6] space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#16A34A]">
-                      <Building2 className="w-4 h-4" />
-                      <span>{conf.projectA?.department?.name || 'Public Works Department (PWD)'}</span>
-                    </div>
-                    <div className="text-xs font-bold text-[#17231D]">{conf.projectA?.name}</div>
-                    <div className="flex items-center gap-1 text-[11px] text-[#718078]">
-                      <Calendar className="w-3.5 h-3.5 text-[#16A34A]" />
-                      <span>
-                        {conf.projectA?.startDate ? new Date(conf.projectA.startDate).toLocaleDateString() : 'TBD'} — {conf.projectA?.expectedEndDate ? new Date(conf.projectA.expectedEndDate).toLocaleDateString() : 'TBD'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Project B */}
-                  <div className="p-3.5 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6] space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700">
-                      <Building2 className="w-4 h-4" />
-                      <span>{conf.projectB?.department?.name || 'Kerala Water Authority (KWA)'}</span>
-                    </div>
-                    <div className="text-xs font-bold text-[#17231D]">{conf.projectB?.name}</div>
-                    <div className="flex items-center gap-1 text-[11px] text-[#718078]">
-                      <Calendar className="w-3.5 h-3.5 text-blue-700" />
-                      <span>
-                        {conf.projectB?.startDate ? new Date(conf.projectB.startDate).toLocaleDateString() : 'TBD'} — {conf.projectB?.expectedEndDate ? new Date(conf.projectB.expectedEndDate).toLocaleDateString() : 'TBD'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Joint Action Plan Section */}
-                <div className="p-3.5 bg-amber-50/80 rounded-xl border border-amber-200/80 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-amber-900">
-                      {t.coordination.actionPlan} ({isMl ? 'വകുപ്പുകളുടെ സംയുക്ത കർമ്മപദ്ധതി' : 'Joint Action Plan'}):
-                    </span>
-                    <span className="text-[10px] text-amber-800">
-                      {isMl ? 'മാറ്റങ്ങൾ രേഖപ്പെടുത്താം' : 'Editable by officials'}
-                    </span>
-                  </div>
-
-                  <textarea
-                    rows={2}
-                    value={editingJointPlan}
-                    onChange={(e) => setEditingJointPlan(e.target.value)}
-                    className="w-full text-xs text-[#17231D] bg-white p-2.5 rounded-lg border border-amber-300 focus:border-[#16A34A] outline-none font-medium resize-none"
-                    placeholder="Enter joint coordination agreement..."
-                  />
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center justify-between pt-1">
-                  <p className="text-[11px] text-[#718078]">
-                    {isResolved
-                      ? (isMl ? 'ഈ തീരുമാനം രണ്ട് വകുപ്പുകളിലും രേഖപ്പെടുത്തിയിട്ടുണ്ട്.' : 'Agreement logged across departments.')
-                      : (isMl ? 'രണ്ട് വകുപ്പുകളുടെയും അംഗീകാരം ആവശ്യമുള്ള ഘട്ടം.' : 'Pending interdepartmental alignment.')}
-                  </p>
-
-                  <button
-                    onClick={() => handleToggleConflictResolution(conf.id, conf.status)}
-                    disabled={isResolvingConflict}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active-press flex items-center gap-2 cursor-pointer ${
-                      isResolved
-                        ? 'bg-white border border-[#E4EBE6] text-[#718078] hover:bg-zinc-50'
-                        : 'bg-[#16A34A] hover:bg-[#15803D] text-white shadow-xs'
-                    }`}
-                  >
-                    {isResolvingConflict ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4" />
-                    )}
-                    <span>
-                      {isResolved
-                        ? (isMl ? 'സമന്വയം പുനഃപരിശോധിക്കുക' : 'Re-open Coordination')
-                        : (isMl ? 'സമയക്രമം സമന്വയിപ്പിച്ചു അംഗീകരിക്കുക' : 'Acknowledge & Sync Schedules')}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* Main Tabs Navigation */}
       <div className="flex items-center gap-1 border-b border-[#E4EBE6] pb-2 text-xs font-bold">
         <button
@@ -885,6 +746,143 @@ export const OfficialPortalView: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      )}
+       {conflicts.length > 0 && (
+        <div className="space-y-3">
+          {conflicts.map((conf) => {
+            const isResolved = conf.status === 'RESOLVED';
+            return (
+              <div
+                key={conf.id}
+                className={`bg-white rounded-2xl p-5 border shadow-2xs space-y-4 ${
+                  isResolved ? 'border-[#E4EBE6]' : 'border-amber-300 bg-amber-50/20'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E4EBE6] pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`p-2 rounded-xl ${
+                        isResolved ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      <AlertTriangle className="w-5 h-5" />
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-sm text-[#17231D]">
+                          {t.coordination.conflictAlert}
+                        </h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          {conf.distanceMeters ? `${conf.distanceMeters}m proximity` : 'Same Stretch'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#718078]">
+                        {isMl
+                          ? 'റോഡ് റീ-ടാറിംഗും പൈപ്പ് ലൈൻ കുഴിക്കലും ഒരേസമയം വരുന്നത് തടയുക'
+                          : 'Preventing repeated road excavation & destruction'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold self-start sm:self-auto ${
+                      isResolved
+                        ? 'bg-[#EAF7EF] text-[#16A34A] border border-[#D1EBD9]'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}
+                  >
+                    {isResolved
+                      ? (isMl ? 'സമയക്രമം സമന്വയിപ്പിച്ചു' : 'SCHEDULES SYNCHRONIZED')
+                      : (isMl ? 'വൈരുദ്ധ്യം കണ്ടെത്തി' : 'OVERLAP DETECTED')}
+                  </span>
+                </div>
+
+                {/* Conflicting Projects Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Project A */}
+                  <div className="p-3.5 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6] space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#16A34A]">
+                      <Building2 className="w-4 h-4" />
+                      <span>{conf.projectA?.department?.name || 'Public Works Department (PWD)'}</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#17231D]">{conf.projectA?.name}</div>
+                    <div className="flex items-center gap-1 text-[11px] text-[#718078]">
+                      <Calendar className="w-3.5 h-3.5 text-[#16A34A]" />
+                      <span>
+                        {conf.projectA?.startDate ? new Date(conf.projectA.startDate).toLocaleDateString() : 'TBD'} — {conf.projectA?.expectedEndDate ? new Date(conf.projectA.expectedEndDate).toLocaleDateString() : 'TBD'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Project B */}
+                  <div className="p-3.5 rounded-xl bg-[#F8FAF8] border border-[#E4EBE6] space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700">
+                      <Building2 className="w-4 h-4" />
+                      <span>{conf.projectB?.department?.name || 'Kerala Water Authority (KWA)'}</span>
+                    </div>
+                    <div className="text-xs font-bold text-[#17231D]">{conf.projectB?.name}</div>
+                    <div className="flex items-center gap-1 text-[11px] text-[#718078]">
+                      <Calendar className="w-3.5 h-3.5 text-blue-700" />
+                      <span>
+                        {conf.projectB?.startDate ? new Date(conf.projectB.startDate).toLocaleDateString() : 'TBD'} — {conf.projectB?.expectedEndDate ? new Date(conf.projectB.expectedEndDate).toLocaleDateString() : 'TBD'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Joint Action Plan Section */}
+                <div className="p-3.5 bg-amber-50/80 rounded-xl border border-amber-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-amber-900">
+                      {t.coordination.actionPlan} ({isMl ? 'വകുപ്പുകളുടെ സംയുക്ത കർമ്മപദ്ധതി' : 'Joint Action Plan'}):
+                    </span>
+                    <span className="text-[10px] text-amber-800">
+                      {isMl ? 'മാറ്റങ്ങൾ രേഖപ്പെടുത്താം' : 'Editable by officials'}
+                    </span>
+                  </div>
+
+                  <textarea
+                    rows={2}
+                    value={editingJointPlan}
+                    onChange={(e) => setEditingJointPlan(e.target.value)}
+                    className="w-full text-xs text-[#17231D] bg-white p-2.5 rounded-lg border border-amber-300 focus:border-[#16A34A] outline-none font-medium resize-none"
+                    placeholder="Enter joint coordination agreement..."
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between pt-1">
+                  <p className="text-[11px] text-[#718078]">
+                    {isResolved
+                      ? (isMl ? 'ഈ തീരുമാനം രണ്ട് വകുപ്പുകളിലും രേഖപ്പെടുത്തിയിട്ടുണ്ട്.' : 'Agreement logged across departments.')
+                      : (isMl ? 'രണ്ട് വകുപ്പുകളുടെയും അംഗീകാരം ആവശ്യമുള്ള ഘട്ടം.' : 'Pending interdepartmental alignment.')}
+                  </p>
+
+                  <button
+                    onClick={() => handleToggleConflictResolution(conf.id, conf.status)}
+                    disabled={isResolvingConflict}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active-press flex items-center gap-2 cursor-pointer ${
+                      isResolved
+                        ? 'bg-white border border-[#E4EBE6] text-[#718078] hover:bg-zinc-50'
+                        : 'bg-[#16A34A] hover:bg-[#15803D] text-white shadow-xs'
+                    }`}
+                  >
+                    {isResolvingConflict ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4" />
+                    )}
+                    <span>
+                      {isResolved
+                        ? (isMl ? 'സമന്വയം പുനഃപരിശോധിക്കുക' : 'Re-open Coordination')
+                        : (isMl ? 'സമയക്രമം സമന്വയിപ്പിച്ചു അംഗീകരിക്കുക' : 'Acknowledge & Sync Schedules')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
