@@ -1,5 +1,6 @@
 import './global.css';
 import localFont from 'next/font/local';
+import { ClerkProvider } from '@clerk/nextjs';
 import { AppShell } from '../components/layout/AppShell';
 
 const meera = localFont({
@@ -28,10 +29,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ml" className={meera.variable}>
-      <body className="antialiased selection:bg-[#16A34A] selection:text-white min-h-screen bg-[#F8FAF8] text-[#17231D]">
-        <AppShell>{children}</AppShell>
-      </body>
-    </html>
+    <ClerkProvider
+      publishableKey={
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+        'pk_test_YnJpZ2h0LXNjb3JwaW9uLTY1LmNsZXJrLmFjY291bnRzLmRldiQ'
+      }
+    >
+      <html lang="ml" className={meera.variable}>
+        <body className="antialiased selection:bg-[#16A34A] selection:text-white min-h-screen bg-[#F8FAF8] text-[#17231D]">
+          <AppShell>{children}</AppShell>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

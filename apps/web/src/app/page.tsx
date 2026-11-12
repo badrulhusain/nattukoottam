@@ -27,10 +27,10 @@ export default function HomePage() {
       <StoriesBar />
 
       {/* Quick Post Composer Input */}
-      <PostComposer />
+      {/* <PostComposer /> */}
 
       {/* Trending & Latest Issues Header */}
-      <div className="flex items-center justify-between px-1 pt-1">
+      {/* <div className="flex items-center justify-between px-1 pt-1">
         <div className="flex items-center gap-2">
           <span className="p-1.5 rounded-lg bg-orange-50 text-orange-600 border border-orange-200">
             <Flame className="w-4 h-4" />
@@ -46,7 +46,7 @@ export default function HomePage() {
             </p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Posts Feed List (Only Trending & Latest Issues) */}
       <div className="space-y-3 pt-0.5">

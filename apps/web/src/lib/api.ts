@@ -11,6 +11,31 @@ export function getApiBaseUrl(): string {
     : 'http://localhost:3000';
 
   return new URL(apiBase, origin).toString().replace(/\/+$/, '');
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api`;
+  }
+  return 'http://localhost:3000/api';
+}
+
+export function buildApiUrl(endpoint: string, params?: Record<string, string | number | undefined>): string {
+  const apiBase = getApiBaseUrl();
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const fullUrlStr = apiBase.startsWith('http') ? `${apiBase}${cleanEndpoint}` : `${origin}${apiBase}${cleanEndpoint}`;
+  const url = new URL(fullUrlStr);
+
+  if (params) {
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        url.searchParams.set(key, String(val));
+      }
+    });
+  }
+
+  return url.toString();
 }
 
 const TOKEN_KEY = 'naatukoottam_access_token';
@@ -105,6 +130,34 @@ export async function registerApi(params: RegisterParams) {
   return data;
 }
 
+export async function syncClerkUserApi(data: {
+  clerkId: string;
+  email?: string;
+  phone?: string;
+  fullName?: string;
+  avatarUrl?: string;
+  district?: string;
+  locality?: string;
+}) {
+  const apiBase = getApiBaseUrl();
+  const res = await fetch(`${apiBase}/auth/clerk-sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: 'Clerk sync failed' }));
+    throw new Error(err.message || 'Failed to synchronize Clerk user');
+  }
+
+  const result = await res.json();
+  if (result.tokens?.accessToken) {
+    saveStoredTokens(result.tokens.accessToken, result.tokens.refreshToken);
+  }
+  return result;
+}
+
 export async function getCurrentUserApi() {
   const token = getStoredToken();
   if (!token) return null;
@@ -154,10 +207,8 @@ export async function updateUserLocationApi(locationData: { locality: string; di
 
 export async function fetchLivePosts(locality?: string) {
   try {
-    const apiBase = getApiBaseUrl();
-    const url = new URL(`${apiBase}/posts`);
-    if (locality) url.searchParams.set('locality', locality);
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const url = buildApiUrl('posts', locality ? { locality } : undefined);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch posts');
     const json = await res.json();
     // Return clean data array directly without metadata wrap
@@ -186,10 +237,8 @@ export async function createLivePostApi(postData: any) {
 
 export async function fetchLiveIssues(locality?: string) {
   try {
-    const apiBase = getApiBaseUrl();
-    const url = new URL(`${apiBase}/issues`);
-    if (locality) url.searchParams.set('locality', locality);
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const url = buildApiUrl('issues', locality ? { locality } : undefined);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch issues');
     const json = await res.json();
     return Array.isArray(json) ? json : json.data || [];
@@ -201,10 +250,8 @@ export async function fetchLiveIssues(locality?: string) {
 
 export async function fetchLiveConflicts(locality?: string) {
   try {
-    const apiBase = getApiBaseUrl();
-    const url = new URL(`${apiBase}/projects/conflicts`);
-    if (locality) url.searchParams.set('locality', locality);
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const url = buildApiUrl('projects/conflicts', locality ? { locality } : undefined);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch conflicts');
     const json = await res.json();
     return Array.isArray(json) ? json : json.data || [];
@@ -216,10 +263,8 @@ export async function fetchLiveConflicts(locality?: string) {
 
 export async function fetchLiveProjects(locality?: string) {
   try {
-    const apiBase = getApiBaseUrl();
-    const url = new URL(`${apiBase}/projects`);
-    if (locality) url.searchParams.set('locality', locality);
-    const res = await fetch(url.toString(), { cache: 'no-store' });
+    const url = buildApiUrl('projects', locality ? { locality } : undefined);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch projects');
     const json = await res.json();
     return Array.isArray(json) ? json : json.data || [];

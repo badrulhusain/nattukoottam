@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Lock,
@@ -17,6 +17,7 @@ import {
   Sparkles,
   ArrowRight,
 } from 'lucide-react';
+import { SignIn, SignUp, useUser } from '@clerk/nextjs';
 import { useAppStore } from '../../lib/store';
 import { getT } from '../../lib/translations';
 import { loginApi, registerApi } from '../../lib/api';
@@ -32,10 +33,19 @@ export const AuthModal: React.FC = () => {
     login,
   } = useAppStore();
   const t = getT(language);
+  const { isSignedIn } = useUser();
 
   const [mode, setMode] = useState<'login' | 'register'>(
     authModalMode === 'register' ? 'register' : 'login'
   );
+  const [authMethod, setAuthMethod] = useState<'clerk' | 'direct'>('clerk');
+
+  // Auto-close modal when Clerk authentication succeeds
+  useEffect(() => {
+    if (isSignedIn) {
+      setIsAuthModalOpen(false);
+    }
+  }, [isSignedIn, setIsAuthModalOpen]);
 
   // Login form state
   const [loginIdentifier, setLoginIdentifier] = useState('+919846000001');
@@ -175,37 +185,101 @@ export const AuthModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Tab Switcher: Login vs Register */}
-        <div className="grid grid-cols-2 p-1 bg-[#F7FAF7] rounded-2xl border border-[#E6EEE8]">
+        {/* Auth Method Switcher: Clerk (Google, OTP) vs Direct Password */}
+        <div className="flex items-center gap-1.5 p-1 bg-[#F8FAF8] rounded-2xl border border-[#E4EBE6]">
           <button
             type="button"
-            onClick={() => {
-              setMode('login');
-              setErrorMessage(null);
-            }}
-            className={`py-2 text-xs font-bold rounded-xl transition-all ${
-              mode === 'login'
-                ? 'bg-white text-[#087A45] shadow-xs'
-                : 'text-[#77847C] hover:text-[#17251D]'
+            onClick={() => setAuthMethod('clerk')}
+            className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              authMethod === 'clerk'
+                ? 'bg-white text-[#16A34A] shadow-xs border border-[#D1EBD9]'
+                : 'text-[#718078] hover:text-[#17251D]'
             }`}
           >
-            {t.auth.signIn}
+            <Sparkles className="w-3.5 h-3.5 text-[#16A34A]" />
+            <span>Clerk Auth</span>
           </button>
           <button
             type="button"
-            onClick={() => {
-              setMode('register');
-              setErrorMessage(null);
-            }}
-            className={`py-2 text-xs font-bold rounded-xl transition-all ${
-              mode === 'register'
-                ? 'bg-white text-[#087A45] shadow-xs'
-                : 'text-[#77847C] hover:text-[#17251D]'
+            onClick={() => setAuthMethod('direct')}
+            className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              authMethod === 'direct'
+                ? 'bg-white text-[#16A34A] shadow-xs border border-[#D1EBD9]'
+                : 'text-[#718078] hover:text-[#17251D]'
             }`}
           >
-            {t.auth.register}
+            <Lock className="w-3.5 h-3.5 text-[#16A34A]" />
+            <span>Official / Password</span>
           </button>
         </div>
+
+        {authMethod === 'clerk' ? (
+          <div className="w-full flex justify-center py-1">
+            {mode === 'login' ? (
+              <SignIn
+                routing="hash"
+                appearance={{
+                  variables: {
+                    colorPrimary: '#16A34A',
+                    borderRadius: '0.75rem',
+                  },
+                  elements: {
+                    rootBox: 'w-full flex justify-center',
+                    card: 'shadow-none border-none p-0 w-full bg-transparent',
+                    formButtonPrimary: 'bg-[#16A34A] hover:bg-[#15803D] text-xs font-bold rounded-xl py-2.5',
+                  },
+                }}
+              />
+            ) : (
+              <SignUp
+                routing="hash"
+                appearance={{
+                  variables: {
+                    colorPrimary: '#16A34A',
+                    borderRadius: '0.75rem',
+                  },
+                  elements: {
+                    rootBox: 'w-full flex justify-center',
+                    card: 'shadow-none border-none p-0 w-full bg-transparent',
+                    formButtonPrimary: 'bg-[#16A34A] hover:bg-[#15803D] text-xs font-bold rounded-xl py-2.5',
+                  },
+                }}
+              />
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Tab Switcher: Login vs Register */}
+            <div className="grid grid-cols-2 p-1 bg-[#F7FAF7] rounded-2xl border border-[#E6EEE8]">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setErrorMessage(null);
+                }}
+                className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                  mode === 'login'
+                    ? 'bg-white text-[#087A45] shadow-xs'
+                    : 'text-[#77847C] hover:text-[#17251D]'
+                }`}
+              >
+                {t.auth.signIn}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('register');
+                  setErrorMessage(null);
+                }}
+                className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                  mode === 'register'
+                    ? 'bg-white text-[#087A45] shadow-xs'
+                    : 'text-[#77847C] hover:text-[#17251D]'
+                }`}
+              >
+                {t.auth.register}
+              </button>
+            </div>
 
         {/* Error Alert */}
         {errorMessage && (
@@ -464,6 +538,8 @@ export const AuthModal: React.FC = () => {
               )}
             </button>
           </form>
+        )}
+          </>
         )}
       </div>
     </div>

@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAppStore } from '../../lib/store';
 import { fetchLivePosts, fetchLiveIssues, getCurrentUserApi } from '../../lib/api';
-import { getSavedLocation, saveLocationToStorage } from '../../lib/geolocation';
+import { getSavedLocation, saveLocationToStorage, reverseGeocodeCoordinates } from '../../lib/geolocation';
 import { Post } from '../../types';
 import { AppHeader } from './AppHeader';
 import { DesktopSidebar } from './DesktopSidebar';
@@ -13,9 +13,23 @@ import { BottomNav } from './BottomNav';
 import { OnboardingModal } from '../onboarding/OnboardingModal';
 import { CreatePostModal } from '../create/CreatePostModal';
 import { AuthModal } from '../auth/AuthModal';
+import { ClerkSyncHandler } from '../auth/ClerkSyncHandler';
 import { LocationPromptModal } from '../location/LocationPromptModal';
 import { StoryViewerModal } from '../stories/StoryViewerModal';
 import { AddStoryModal } from '../stories/AddStoryModal';
+
+function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return 'Just now';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d ago`;
+  return date.toLocaleDateString();
+}
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
@@ -24,6 +38,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     setPosts,
     setLocality,
     setUserLocation,
+    saveAndSetUserLocation,
     setIsLocationPromptOpen,
     login,
     setActiveTab,
@@ -48,17 +63,43 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
   }, [pathname, setActiveTab]);
 
-  // Check for saved location on initial website open
+  // Check for saved location on initial website open; if missing, ask for location and cache it
   useEffect(() => {
     const saved = getSavedLocation();
     if (saved && saved.locality) {
       setLocality(saved.locality);
       setUserLocation(saved);
+      return;
+    }
+
+    // First time opening the website: ask for browser GPS location and save to cache
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude, accuracy } = position.coords;
+            const detected = await reverseGeocodeCoordinates(latitude, longitude, accuracy);
+            saveAndSetUserLocation(detected);
+          } catch (err) {
+            console.warn('GPS reverse geocode error:', err);
+            setIsLocationPromptOpen(true);
+          }
+        },
+        (error) => {
+          console.warn('Browser GPS prompt error or dismissed:', error.message);
+          // If browser prompt is blocked, dismissed, or unavailable, display prompt modal to pick ward
+          setIsLocationPromptOpen(true);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
     } else {
-      // First time opening the website: prompt user to set their ward location
       setIsLocationPromptOpen(true);
     }
-  }, [setLocality, setUserLocation, setIsLocationPromptOpen]);
+  }, [setLocality, setUserLocation, saveAndSetUserLocation, setIsLocationPromptOpen]);
 
   // Restore authenticated session from stored JWT if valid
   useEffect(() => {
@@ -117,7 +158,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         const postItems = Array.isArray(postsRes) ? postsRes : postsRes?.data || [];
         const issueItems = Array.isArray(issuesRes) ? issuesRes : issuesRes?.data || [];
 
-        const mappedPosts: Post[] = postItems.map((p: any) => ({
+        const mappedPosts: (Post & { rawCreatedAt?: string })[] = postItems.map((p: any) => ({
           id: p.id,
           author: {
             id: p.author?.id || p.authorId || 'anon',
@@ -140,11 +181,12 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           isSupported: Boolean(p.isSupported),
           commentsCount: p.commentsCount ?? p._count?.comments ?? 0,
           sharesCount: 0,
-          createdAt: p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'Just now',
+          createdAt: formatRelativeTime(p.createdAt),
+          rawCreatedAt: p.createdAt,
           isInfrastructureIssue: false,
         }));
 
-        const mappedIssues: Post[] = issueItems.map((issue: any) => ({
+        const mappedIssues: (Post & { rawCreatedAt?: string })[] = issueItems.map((issue: any) => ({
           id: issue.id,
           author: {
             id: issue.reporter?.id || issue.reporterId || 'anon',
@@ -171,13 +213,21 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           isSupported: Boolean(issue.isSupported),
           commentsCount: issue.commentsCount ?? issue._count?.comments ?? 0,
           sharesCount: 0,
-          createdAt: issue.createdAt ? new Date(issue.createdAt).toLocaleDateString() : 'Just now',
+          createdAt: formatRelativeTime(issue.createdAt),
+          rawCreatedAt: issue.createdAt,
           isInfrastructureIssue: true,
           status: issue.status || 'UNDER_REVIEW',
         }));
 
         const allItems = [...mappedIssues, ...mappedPosts];
-        setPosts(allItems);
+        if (allItems.length > 0) {
+          allItems.sort((a, b) => {
+            const timeA = a.rawCreatedAt ? new Date(a.rawCreatedAt).getTime() : 0;
+            const timeB = b.rawCreatedAt ? new Date(b.rawCreatedAt).getTime() : 0;
+            return timeB - timeA;
+          });
+          setPosts(allItems);
+        }
       } catch (err) {
         console.warn('Failed to load live feed from Neon DB:', err);
       }
@@ -209,6 +259,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
       {/* Mobile Bottom Dock Navigation */}
       <BottomNav />
+
+      {/* Clerk User Synchronization with Neon DB */}
+      <ClerkSyncHandler />
 
       {/* Onboarding Welcome Screen */}
       <OnboardingModal />

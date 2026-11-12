@@ -69,22 +69,24 @@ export const StoryViewerModal: React.FC = () => {
     if (!currentSlide || isPaused) return;
 
     setProgress(0);
+    const startTime = Date.now();
     const intervalTime = 50; // update every 50ms
-    const step = (intervalTime / SLIDE_DURATION_MS) * 100;
 
     const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(timer);
-          nextStorySlide();
-          return 0;
-        }
-        return prev + step;
-      });
+      const elapsed = Date.now() - startTime;
+      const pct = (elapsed / SLIDE_DURATION_MS) * 100;
+
+      if (pct >= 100) {
+        clearInterval(timer);
+        setProgress(100);
+        nextStorySlide();
+      } else {
+        setProgress(pct);
+      }
     }, intervalTime);
 
     return () => clearInterval(timer);
-  }, [currentSlide, activeStorySlideIndex, activeStoryUserIndex, isPaused, nextStorySlide]);
+  }, [currentSlide?.id, activeStorySlideIndex, activeStoryUserIndex, isPaused, nextStorySlide]);
 
   if (activeStoryUserIndex === null || !activeUserStory || !currentSlide) {
     return null;
